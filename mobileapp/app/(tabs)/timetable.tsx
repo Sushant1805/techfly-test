@@ -61,7 +61,7 @@ export default function TimetableScreen() {
           </View>
         ) : (
           dayClasses.map((cls, idx) => (
-            <Card key={idx} style={s.classCard}>
+            <Card key={`${cls.subject}-${cls.time}`} style={s.classCard}>
               {/* Colored left accent */}
               <View style={[s.accentBar, { backgroundColor: cls.color }]} />
 

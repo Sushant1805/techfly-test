@@ -17,14 +17,14 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange, classN
           onClick={() => onTabChange(tab.id)}
           className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
             activeTab === tab.id
-              ? 'text-purple-600'
+              ? 'text-brand-blue'
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           {tab.icon}
           {tab.label}
           {activeTab === tab.id && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue" />
           )}
         </button>
       ))}

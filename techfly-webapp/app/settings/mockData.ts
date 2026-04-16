@@ -1,0 +1,193 @@
+import { 
+  CompanyProfile, 
+  TeamMember, 
+  Permission, 
+  FeatureFlag, 
+  ApiKey, 
+  WebhookEndpoint, 
+  AuditLog, 
+  NotificationRule, 
+  MessageTemplate 
+} from './types';
+
+export const mockCompanyProfile: CompanyProfile = {
+  name: "TechFly Technologies Pvt. Ltd.",
+  legalEntityType: "Private Limited Company",
+  cin: "U72900MH2020PTC123456",
+  incorporationDate: "2020-03-15",
+  website: "www.techfly.in",
+  tagline: "Empowering coaching institutes with smart technology",
+  primaryEmail: "support@techfly.in",
+  salesEmail: "sales@techfly.in",
+  billingEmail: "billing@techfly.in",
+  primaryPhone: "9876500000",
+  secondaryPhone: "9876500001",
+  address: {
+    line1: "501, Tech Tower, Baner Road",
+    line2: "Near Balewadi High Street",
+    city: "Pune",
+    state: "Maharashtra",
+    pinCode: "411045",
+    country: "India"
+  },
+  gstNumber: "27AABCT1234M1Z5",
+  panNumber: "AABCT1234M",
+  tanNumber: "PUNE12345A",
+  msmeNumber: "UDYAM-MH-00-1234567"
+};
+
+export const mockTeamMembers: TeamMember[] = [
+  {
+    id: "TM001",
+    name: "Vikram Shah",
+    avatar: "/avatars/vs.png",
+    initials: "VS",
+    email: "vikram@techfly.in",
+    phone: "9876500000",
+    role: "Super Admin",
+    status: "Active",
+    lastActive: "11 Apr 2026, 9:42 AM",
+    twoFactorEnabled: true,
+    joinedAt: "2020-03-15"
+  },
+  {
+    id: "TM002",
+    name: "Neha Gupta",
+    avatar: "/avatars/ng.png",
+    initials: "NG",
+    email: "neha@techfly.in",
+    phone: "9876500001",
+    role: "Admin",
+    status: "Active",
+    lastActive: "11 Apr 2026, 8:30 AM",
+    twoFactorEnabled: true,
+    joinedAt: "2021-05-10"
+  },
+  {
+    id: "TM003",
+    name: "Ravi Tiwari",
+    avatar: "/avatars/rt.png",
+    initials: "RT",
+    email: "ravi@techfly.in",
+    phone: "9845003001",
+    role: "Sales Executive",
+    status: "Active",
+    lastActive: "11 Apr 2026, 10:15 AM",
+    twoFactorEnabled: false,
+    joinedAt: "2023-06-15",
+    assignedLeads: 8,
+    assignedCustomers: 4
+  },
+  {
+    id: "TM004",
+    name: "Pooja Mehta",
+    avatar: "/avatars/pm.png",
+    initials: "PM",
+    email: "pooja@techfly.in",
+    phone: "9845003002",
+    role: "Sales Executive",
+    status: "Active",
+    lastActive: "10 Apr 2026, 5:00 PM",
+    twoFactorEnabled: false,
+    joinedAt: "2023-08-01"
+  },
+  {
+    id: "TM005",
+    name: "Sanjay More",
+    avatar: "/avatars/sm.png",
+    initials: "SM",
+    email: "sanjay@techfly.in",
+    phone: "9845003003",
+    role: "Support",
+    status: "Inactive",
+    lastActive: "2 Apr 2026, 11:00 AM",
+    twoFactorEnabled: false,
+    joinedAt: "2022-11-20"
+  }
+];
+
+export const mockPermissions: Permission[] = [
+  { feature: "View Dashboard", category: "DASHBOARD", superAdmin: true, admin: true, salesExecutive: true, support: true, locked: true },
+  { feature: "View Revenue Charts", category: "DASHBOARD", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View All KPIs", category: "DASHBOARD", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View Customer List", category: "CUSTOMERS", superAdmin: true, admin: true, salesExecutive: true, support: true, locked: true },
+  { feature: "View Customer Details", category: "CUSTOMERS", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "Add / Edit Customers", category: "CUSTOMERS", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "Delete Customers", category: "CUSTOMERS", superAdmin: true, admin: false, salesExecutive: false, support: false, locked: true },
+  { feature: "Export Customer Data", category: "CUSTOMERS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View Subscriptions", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: true, support: true, locked: true },
+  { feature: "Create / Edit Subscriptions", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Change Plans", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Cancel / Suspend", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View Invoices", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: false, support: true, locked: true },
+  { feature: "Generate Invoices", category: "SUBSCRIPTIONS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View CRM Pipeline", category: "SALES", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "Add / Edit Leads", category: "SALES", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "Delete Leads", category: "SALES", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Manage Follow-ups", category: "SALES", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "Schedule Demos", category: "SALES", superAdmin: true, admin: true, salesExecutive: true, support: false, locked: true },
+  { feature: "View All Leads (not just own)", category: "SALES", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View Analytics", category: "ANALYTICS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Export Reports", category: "ANALYTICS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "View Settings", category: "SETTINGS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Edit Company Settings", category: "SETTINGS", superAdmin: true, admin: false, salesExecutive: false, support: false, locked: true },
+  { feature: "Manage Team Members", category: "SETTINGS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+  { feature: "Manage Billing", category: "SETTINGS", superAdmin: true, admin: false, salesExecutive: false, support: false, locked: true },
+  { feature: "Access Danger Zone", category: "SETTINGS", superAdmin: true, admin: false, salesExecutive: false, support: false, locked: true },
+  { feature: "View Audit Logs", category: "SETTINGS", superAdmin: true, admin: true, salesExecutive: false, support: false, locked: true },
+];
+
+export const mockFeatureFlags: FeatureFlag[] = [
+  { id: "ff1", name: "AI Timetable Generator", key: "ai_timetable", status: true, availableFor: "Pro Plan only", betaCustomerIds: [], description: "Generate conflict-free timetables using Claude AI", lastChangedAt: "1 Mar 2026", lastChangedBy: "Vikram Shah" },
+  { id: "ff2", name: "WhatsApp Notifications", key: "whatsapp_notif", status: true, availableFor: "Pro Plan only", betaCustomerIds: [], description: "Send automated alerts via WhatsApp", lastChangedAt: "15 Feb 2026", lastChangedBy: "Vikram Shah" },
+  { id: "ff3", name: "Analytics Dashboard", key: "analytics_v2", status: true, availableFor: "Pro Plan only", betaCustomerIds: [], description: "Advanced revenue and growth analytics", lastChangedAt: "1 Jan 2026", lastChangedBy: "System" },
+  { id: "ff4", name: "Assignment Module", key: "assignments", status: true, availableFor: "Basic+", betaCustomerIds: [], description: "Student assignment and grading system", lastChangedAt: "1 Jan 2026", lastChangedBy: "System" },
+  { id: "ff5", name: "Custom Branding", key: "custom_branding", status: true, availableFor: "Pro Plan only", betaCustomerIds: [], description: "Remove EzzyCoach logo and use custom domain", lastChangedAt: "1 Jan 2026", lastChangedBy: "System" },
+  { id: "ff6", name: "Multi-branch Support", key: "multi_branch", status: false, availableFor: "Coming Soon", betaCustomerIds: [], description: "Manage multiple coaching center locations", lastChangedAt: null, lastChangedBy: null },
+  { id: "ff7", name: "Mobile App (Teacher)", key: "mobile_teacher", status: true, availableFor: "All Plans", betaCustomerIds: [], description: "Dedicated app for teachers to manage classes", lastChangedAt: "1 Mar 2026", lastChangedBy: "Vikram Shah" },
+  { id: "ff8", name: "API Access", key: "api_access", status: false, availableFor: "Pro Plan only", betaCustomerIds: [], description: "External API for student data sync", lastChangedAt: null, lastChangedBy: null },
+  { id: "ff9", name: "Bulk SMS", key: "bulk_sms", status: true, availableFor: "Basic+", betaCustomerIds: [], description: "Send SMS blasts to students and parents", lastChangedAt: "10 Feb 2026", lastChangedBy: "Vikram Shah" },
+  { id: "ff10", name: "Parent Portal", key: "parent_portal", status: false, availableFor: "Beta", betaCustomerIds: ["CUS001", "CUS009"], description: "Special access for parents to track progress", lastChangedAt: null, lastChangedBy: null },
+];
+
+export const mockAuditLogs: AuditLog[] = [
+  { 
+    id: "log1", 
+    timestamp: "11 Apr 2026 10:15 AM", 
+    userId: "TM003", 
+    userName: "Ravi Tiwari", 
+    userRole: "Sales Executive",
+    action: "Updated", 
+    resource: "Lead", 
+    resourceId: "LEAD001",
+    details: '"Star Coaching Centre" moved to Negotiation', 
+    ipAddress: "103.21.x.x", 
+    userAgent: "Chrome 124 / Windows 11", 
+    sessionId: "sess_1" 
+  },
+  { id: "log2", timestamp: "11 Apr 2026 09:42 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "Login", resource: "Auth", resourceId: null, details: "Login from Chrome, Pune", ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_2" },
+  { id: "log3", timestamp: "11 Apr 2026 09:35 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "View", resource: "Customer", resourceId: "CUS001", details: 'Viewed "Raj Science Classes" detail', ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_2" },
+  { id: "log4", timestamp: "10 Apr 2026 05:00 PM", userId: "TM004", userName: "Pooja Mehta", userRole: "Sales Executive", action: "Create", resource: "Lead", resourceId: "LEAD015", details: 'New lead "Dream Academy" added via Social Media', ipAddress: "103.15.x.x", userAgent: "Firefox 125 / macOS", sessionId: "sess_3" },
+  { id: "log5", timestamp: "10 Apr 2026 04:30 PM", userId: "TM002", userName: "Neha Gupta", userRole: "Admin", action: "Generated", resource: "Invoice", resourceId: "INV-2026-018", details: "INV-2026-018 generated for Mentor IIT Academy", ipAddress: "103.22.x.x", userAgent: "Safari 17 / iPadOS", sessionId: "sess_4" },
+  { id: "log6", timestamp: "10 Apr 2026 03:15 PM", userId: "TM003", userName: "Ravi Tiwari", userRole: "Sales Executive", action: "Logged", resource: "Activity", resourceId: null, details: 'Call logged for "Star Coaching Centre" — 22 min', ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_1" },
+  { id: "log7", timestamp: "9 Apr 2026 02:00 PM", userId: "TM003", userName: "Ravi Tiwari", userRole: "Sales Executive", action: "Completed", resource: "Demo", resourceId: null, details: 'Demo completed for "Aspire Institute" — Very Interested', ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_1" },
+  { id: "log8", timestamp: "8 Apr 2026 11:00 AM", userId: "TM005", userName: "Sanjay More", userRole: "Support", action: "Resolved", resource: "Ticket", resourceId: "TKT104", details: "Ticket #104 resolved for Raj Science Classes", ipAddress: "103.24.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_5" },
+  { id: "log9", timestamp: "5 Apr 2026 11:00 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "Update", resource: "Subscription", resourceId: "SUB001", details: "Raj Science Classes — Auto-renew enabled", ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_6" },
+  { id: "log10", timestamp: "5 Apr 2026 10:30 AM", userId: "TM002", userName: "Neha Gupta", userRole: "Admin", action: "Converted", resource: "Lead", resourceId: "LEAD008", details: '"Summit Coaching" converted → Customer created', ipAddress: "103.22.x.x", userAgent: "Safari 17 / iPadOS", sessionId: "sess_4" },
+  { id: "log11", timestamp: "4 Apr 2026 09:00 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "Update", resource: "Settings", resourceId: null, details: 'Feature flag "AI Timetable" enabled for Pro plan', ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_6" },
+  { id: "log12", timestamp: "3 Apr 2026 02:00 PM", userId: "TM004", userName: "Pooja Mehta", userRole: "Sales Executive", action: "Lost", resource: "Lead", resourceId: "LEAD012", details: '"Milestone Coaching" marked as lost — Price concern', ipAddress: "103.15.x.x", userAgent: "Firefox 125 / macOS", sessionId: "sess_3" },
+  { id: "log13", timestamp: "2 Apr 2026 11:00 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "Delete", resource: "Lead", resourceId: "LEAD002", details: "Duplicate lead removed (Excel Study Hub duplicate)", ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_6" },
+  { id: "log14", timestamp: "1 Apr 2026 09:30 AM", userId: "TM001", userName: "Vikram Shah", userRole: "Super Admin", action: "Create", resource: "Customer", resourceId: "CUS001", details: '"Raj Science Classes" renewed subscription', ipAddress: "103.21.x.x", userAgent: "Chrome 124 / Windows 11", sessionId: "sess_7" },
+  { id: "log15", timestamp: "1 Apr 2026 08:00 AM", userId: "System", userName: "System", userRole: "System", action: "Auto-renewed", resource: "Subscription", resourceId: "SUB001", details: "Raj Science Classes — Pro Annual auto-renewed", ipAddress: "System", userAgent: "System", sessionId: "System" },
+];
+
+export const mockMessageTemplates: MessageTemplate[] = [
+  { id: "mt1", name: "Welcome — New Signup", channel: "Both", subject: "Welcome to EzzyCoach!", body: "Dear {owner_name}, welcome to the TechFly family. Your EzzyCoach {plan_name} account is ready...", variables: ["{owner_name}", "{plan_name}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt2", name: "Trial Expiry Reminder", channel: "Both", subject: "Your trial expires in {days_remaining} days", body: "Dear {owner_name}, your trial of {plan_name} is ending on {expiry_date}...", variables: ["{owner_name}", "{plan_name}", "{days_remaining}", "{expiry_date}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt3", name: "Payment Receipt", channel: "Both", subject: "Payment received for INV-{invoice_number}", body: "Dear {owner_name}, we have received your payment of {amount} for {plan_name}...", variables: ["{owner_name}", "{amount}", "{invoice_number}", "{plan_name}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt4", name: "Renewal Reminder (7 days)", channel: "Both", subject: "Upcoming renewal for your subscription", body: "Your {plan_name} subscription will renew on {expiry_date}...", variables: ["{plan_name}", "{expiry_date}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt5", name: "Renewal Reminder (1 day)", channel: "Email", subject: "Your subscription renews tomorrow", body: "Quick reminder: your subscription for {plan_name} renews in 24 hours...", variables: ["{plan_name}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt6", name: "Subscription Expired", channel: "Both", subject: "Your subscription has expired", body: "Dear {owner_name}, your access to EzzyCoach {plan_name} has been suspended...", variables: ["{owner_name}", "{plan_name}"], status: "Active", lastEditedAt: "1 Mar 2026", lastEditedBy: "Neha Gupta" },
+  { id: "mt7", name: "Plan Upgrade Confirmation", channel: "Email", subject: "Congrats on your upgrade!", body: "Your account has been upgraded to {plan_name} successfully...", variables: ["{plan_name}"], status: "Active", lastEditedAt: "15 Feb 2026", lastEditedBy: "Vikram Shah" },
+  { id: "mt8", name: "Support Ticket Created", channel: "Email", subject: "Ticket Opened: {ticket_id}", body: "We have received your request. Our team will get back to you soon...", variables: ["{ticket_id}"], status: "Active", lastEditedAt: "1 Jan 2026", lastEditedBy: "Vikram Shah" },
+];

@@ -53,7 +53,7 @@ export const Sidebar = ({ isExpanded, setIsExpanded }: { isExpanded: boolean, se
       <div className={`flex-1 flex flex-col relative w-full ${!isExpanded ? 'items-center' : ''}`}>
         {/* Connecting Line (Only visible when collapsed) */}
         {!isExpanded && (
-          <div className="absolute top-0 bottom-16 left-1/2 -px-[1px] w-[2px] bg-white shadow-sm z-0" />
+          <div className="absolute top-0 bottom-16 left-1/2 -translate-x-[1px] w-[2px] bg-gray-200 z-0" />
         )}
 
         <div className={`flex-1 overflow-y-visible no-scrollbar flex flex-col gap-3 py-2 z-10 relative ${
@@ -74,7 +74,6 @@ export const Sidebar = ({ isExpanded, setIsExpanded }: { isExpanded: boolean, se
                       ? 'bg-transparent text-gray-500 hover:bg-white hover:text-brand-blue hover:shadow-soft'
                       : 'bg-white text-gray-400 hover:text-brand-blue shadow-sm hover:shadow-soft'
                 }`}
-                title={!isExpanded ? "" : undefined}
               >
                 <item.icon className="w-5 h-5 shrink-0" />
                 

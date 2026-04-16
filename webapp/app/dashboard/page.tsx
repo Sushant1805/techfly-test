@@ -21,12 +21,14 @@ const COLORS = ['#5E4E99', '#1D9E75', '#D85A30', '#378ADD', '#BA7517', '#9E1D6A'
 
 export default function Dashboard() {
   const [greeting, setGreeting] = useState('');
+  const [todayDate, setTodayDate] = useState('');
   
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Good Morning');
     else if (hour < 17) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
+    setTodayDate(new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
   }, []);
 
   return (
@@ -40,7 +42,7 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm font-bold text-gray-400 mt-2 uppercase tracking-[0.2em] flex items-center gap-2">
             <Calendar className="w-4 h-4 text-brand-blue" />
-            Saturday, 11 April 2026
+            {todayDate}
           </p>
         </div>
         <div className="flex items-center gap-3">

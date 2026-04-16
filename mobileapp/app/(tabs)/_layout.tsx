@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { LayoutDashboard, CheckSquare, FileText, Users, Calendar } from 'lucide-react-native';
-import { colors, radius, shadows } from '../../src/data/mockData';
+import { colors, radius } from '../../src/data/mockData';
 import { View, Platform } from 'react-native';
 
 export default function TabLayout() {

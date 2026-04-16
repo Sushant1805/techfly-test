@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
@@ -21,6 +21,13 @@ export default function AttendanceScreen() {
   const [attendance, setAttendance] = useState<Record<string, boolean | null>>(() =>
     batchStudents.reduce((acc, s) => ({ ...acc, [s.id]: null }), {} as Record<string, boolean | null>)
   );
+
+  useEffect(() => {
+    const fresh = students
+      .filter(s => s.batch === selectedBatch)
+      .reduce((acc, s) => ({ ...acc, [s.id]: null }), {} as Record<string, boolean | null>);
+    setAttendance(fresh);
+  }, [selectedBatch]);
 
   const toggle = (id: string, val: boolean) => {
     setAttendance(prev => ({ ...prev, [id]: prev[id] === val ? null : val }));

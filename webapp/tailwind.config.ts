@@ -22,6 +22,7 @@ const config: Config = {
       boxShadow: {
         'soft': '0 10px 40px -10px rgba(0, 50, 150, 0.08)',
         'soft-lg': '0 20px 50px -10px rgba(0, 50, 150, 0.12)',
+        'soft-xl': '0 30px 60px -12px rgba(0, 50, 150, 0.15)',
         'glow': '0 0 20px rgba(0, 82, 255, 0.4)',
       },
       borderRadius: {

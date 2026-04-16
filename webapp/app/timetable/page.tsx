@@ -44,7 +44,7 @@ export default function TimetablePage() {
          <div className="bg-text-slate/90 backdrop-blur-xl rounded-[32px] p-6 shadow-2xl flex items-center gap-6 border border-white/10 ring-1 ring-black/20">
             <div className="flex -space-x-3">
                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-10 h-10 rounded-xl border-4 border-text-slate bg-brand-blue/20 flex items-center justify-center text-[10px] font-black text-white/50">
+                  <div key={i} className="w-10 h-10 rounded-xl border-4 border-text-slate bg-brand-blue/20 flex items-center justify-center text-[10px] font-black text-white/80">
                      B{i}
                   </div>
                ))}
