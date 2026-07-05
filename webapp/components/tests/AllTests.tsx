@@ -1,32 +1,120 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { 
-  Search, Plus, MapPin, Calendar, 
-  Clock, User, ChevronRight, Edit2, 
+import {
+  Search, Plus, MapPin, Calendar,
+  Clock, User, ChevronRight, Edit2,
   Trash2, Eye, MoreVertical, AlertCircle,
-  CheckCircle2, Filter
+  CheckCircle2, Filter, CheckCircle, XCircle
 } from 'lucide-react';
-import { tests, subjectsMock, Test } from '@/lib/mockData';
+import { subjectsMock, Test } from '@/lib/mockData';
+import { CreateTestModal } from '@/components/tests/TestModals';
 
 export const AllTests: React.FC<{ onEnterMarks: (testId: string) => void }> = ({ onEnterMarks }) => {
+  const [tests, setTests] = useState<Test[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateTestOpen, setIsCreateTestOpen] = useState(false);
+  const [userRole, setUserRole] = useState('teacher');
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+
+  const allowedCreateRoles = ['owner', 'manager', 'teacher', 'techfly_admin'];
+  const canCreateTests = allowedCreateRoles.includes(userRole);
+
+  const fetchTests = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      setUserRole(user.role || 'teacher');
+
+      const res = await fetch(`/api/${instituteSlug}/tests`);
+      const data = await res.json();
+
+      if (data.success) {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const mapped = data.tests.map((t: any) => {
+          const testDateStr = t.date;
+          const isCompleted = testDateStr < todayStr;
+
+          return {
+            id: t._id,
+            title: t.title,
+            subject: t.subject,
+            subjectColor: '#5E4E99',
+            batchId: t.batchId?._id || '',
+            batchName: t.batchId?.name || 'Unassigned',
+            standard: t.batchId?.standard || '10th',
+            teacherId: t.teacher?._id || '',
+            teacherName: t.teacher?.name || 'TBA',
+            testType: t.testType || 'Chapter Test',
+            totalMarks: t.maxMarks || 100,
+            passingMarks: t.passingMarks || 40,
+            duration: t.duration || 60,
+            scheduledDate: t.date,
+            scheduledTime: t.startTime || '10:00 AM',
+            venue: t.venue || 'Main Building',
+            status: isCompleted ? 'Completed' : 'Upcoming',
+            instructions: t.instructions || '',
+            syllabus: t.syllabus || '',
+            createdAt: t.createdAt,
+            marksEntryDone: false,
+            averageScore: null,
+            highestScore: null,
+            lowestScore: null,
+            passCount: null,
+            failCount: null
+          };
+        });
+        setTests(mapped);
+      }
+    } catch (error) {
+      console.error('Error fetching tests:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestCreated = (message: string) => {
+    setToast({ show: true, message, type: 'success' });
+    setIsCreateTestOpen(false);
+    fetchTests();
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  const handleTestError = (message: string) => {
+    setToast({ show: true, message, type: 'error' });
+    setTimeout(() => setToast({ show: false, message: '', type: 'error' }), 5000);
+  };
+
+  useEffect(() => {
+    fetchTests();
+  }, []);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBatch, setFilterBatch] = useState('All');
   const [filterSubject, setFilterSubject] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
 
+  // Get unique batch names from tests
+  const uniqueBatches = useMemo(() => {
+    const batches = new Set(tests.map(t => t.batchName).filter(Boolean));
+    return Array.from(batches);
+  }, [tests]);
+
   const filteredTests = useMemo(() => {
     return tests.filter(t => {
-      const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchesSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            t.subject.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesBatch = filterBatch === 'All' || t.batchName === filterBatch;
       const matchesSubject = filterSubject === 'All' || t.subject === filterSubject;
       const matchesStatus = filterStatus === 'All' || t.status === filterStatus;
       return matchesSearch && matchesBatch && matchesSubject && matchesStatus;
     });
-  }, [searchTerm, filterBatch, filterSubject, filterStatus]);
+  }, [searchTerm, filterBatch, filterSubject, filterStatus, tests]);
 
   const stats = useMemo(() => {
     const total = tests.length;
@@ -34,13 +122,29 @@ export const AllTests: React.FC<{ onEnterMarks: (testId: string) => void }> = ({
     const completed = tests.filter(t => t.status === 'Completed').length;
     const pendingMarks = tests.filter(t => t.status === 'Completed' && !t.marksEntryDone).length;
     return { total, upcoming, completed, pendingMarks };
-  }, []);
+  }, [tests]);
 
   const upcomingTests = filteredTests.filter(t => t.status === 'Upcoming');
   const completedTests = filteredTests.filter(t => t.status === 'Completed');
 
   return (
     <div className="space-y-10 pb-20">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-6 right-6 z-[300] animate-in slide-in-from-right-8 duration-500`}>
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl ${
+            toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          } text-white`}>
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5" />
+            ) : (
+              <XCircle className="w-5 h-5" />
+            )}
+            <span className="font-black text-sm tracking-tight">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* 1. Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-6 p-6 rounded-[28px] bg-white shadow-soft">
         <div className="flex flex-wrap items-center gap-4 flex-1">
@@ -53,16 +157,15 @@ export const AllTests: React.FC<{ onEnterMarks: (testId: string) => void }> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select 
+          <select
             className="h-11 px-4 rounded-xl border border-gray-100 bg-bg-soft/10 text-[10px] font-black uppercase tracking-widest focus:outline-none"
             value={filterBatch}
             onChange={(e) => setFilterBatch(e.target.value)}
           >
-            <option>All Batches</option>
-            <option>Batch A</option>
-            <option>Batch B</option>
-            <option>Batch C</option>
-            <option>Batch D</option>
+            <option value="All">All Batches</option>
+            {uniqueBatches.map(batch => (
+              <option key={batch} value={batch}>{batch}</option>
+            ))}
           </select>
           <select 
             className="h-11 px-4 rounded-xl border border-gray-100 bg-bg-soft/10 text-[10px] font-black uppercase tracking-widest focus:outline-none"
@@ -73,7 +176,11 @@ export const AllTests: React.FC<{ onEnterMarks: (testId: string) => void }> = ({
             {subjectsMock.map(s => <option key={s.id}>{s.name}</option>)}
           </select>
         </div>
-        <Button className="h-11 px-6 rounded-xl bg-brand-blue shadow-lg shadow-brand-blue/20 font-black text-[10px] uppercase tracking-widest gap-2 group">
+        <Button
+          onClick={() => canCreateTests && setIsCreateTestOpen(true)}
+          disabled={!canCreateTests}
+          className="h-11 px-6 rounded-xl bg-brand-blue shadow-lg shadow-brand-blue/20 font-black text-[10px] uppercase tracking-widest gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" /> Create Test
         </Button>
       </div>
@@ -191,6 +298,13 @@ export const AllTests: React.FC<{ onEnterMarks: (testId: string) => void }> = ({
           </table>
         </Card>
       </section>
+
+      <CreateTestModal
+        isOpen={isCreateTestOpen}
+        onClose={() => setIsCreateTestOpen(false)}
+        onSuccess={handleTestCreated}
+        onError={handleTestError}
+      />
     </div>
   );
 };

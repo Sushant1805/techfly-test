@@ -1,13 +1,16 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Search, Bell, RefreshCw, Settings, User, LogOut, TrendingUp, CheckCircle } from 'lucide-react';
+import { setupAuthOptions } from '@/lib/api';
 
 export const Topbar = ({ isSidebarExpanded = false }: { isSidebarExpanded?: boolean }) => {
   const pathname = usePathname();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [user, setUser] = useState<{name: string, role: string, initials: string} | null>(null);
+  const router = useRouter();
   
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -23,8 +26,24 @@ export const Topbar = ({ isSidebarExpanded = false }: { isSidebarExpanded?: bool
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
+    
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const u = JSON.parse(userStr);
+        const nameParts = u.name ? u.name.split(' ') : ['User'];
+        const initials = nameParts.length > 1 ? nameParts[0][0] + nameParts[nameParts.length - 1][0] : nameParts[0][0];
+        setUser({ name: u.name || 'User', role: u.role || 'Teacher', initials: initials.toUpperCase() });
+      } catch(e){}
+    }
+
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleSignOut = () => {
+    setupAuthOptions().logout();
+    router.push('/login');
+  };
 
   const getPageTitle = () => {
     if (pathname === '/') return 'Dashboard';
@@ -122,24 +141,24 @@ export const Topbar = ({ isSidebarExpanded = false }: { isSidebarExpanded?: bool
               onClick={() => setShowProfile(!showProfile)}
               className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-blue to-purple-600 text-white flex items-center justify-center cursor-pointer shadow-soft hover:scale-105 transition-transform border-2 border-white"
             >
-              <span className="font-black text-[11px]">RM</span>
+              <span className="font-black text-[11px]">{user ? user.initials : 'U'}</span>
             </div>
 
             {showProfile && (
               <div className="absolute right-0 mt-3 w-64 bg-white rounded-3xl shadow-soft-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="p-5 bg-gradient-to-br from-brand-blue to-purple-700 text-white">
-                  <p className="font-black text-sm">Rajesh Mehta</p>
-                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">Administrator</p>
+                  <p className="font-black text-sm">{user ? user.name : 'Unknown User'}</p>
+                  <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">{user ? user.role : 'Guest'}</p>
                   <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-black uppercase">
-                    <CheckCircle className="w-3 h-3" /> Pro Plan
+                    <CheckCircle className="w-3 h-3" /> Configured
                   </div>
                 </div>
                 <div className="p-2">
-                  <ProfileLink icon={User} label="My Profile" onClick={() => setShowProfile(false)} />
+                  <ProfileLink icon={User} label="My Profile" onClick={() => { setShowProfile(false); router.push('/profile'); }} />
                   <ProfileLink icon={Settings} label="Institute Settings" onClick={() => setShowProfile(false)} />
-                  <ProfileLink icon={TrendingUp} label="Analytics" onClick={() => setShowProfile(false)} />
+                  <ProfileLink icon={TrendingUp} label="Analytics" onClick={() => { setShowProfile(false); router.push('/analytics'); }} />
                   <hr className="my-2 border-gray-50" />
-                  <ProfileLink icon={LogOut} label="Sign Out" color="text-red-500 hover:bg-red-50" onClick={() => setShowProfile(false)} />
+                  <ProfileLink icon={LogOut} label="Sign Out" color="text-red-500 hover:bg-red-50" onClick={handleSignOut} />
                 </div>
               </div>
             )}

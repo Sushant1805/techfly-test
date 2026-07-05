@@ -7,17 +7,41 @@ import { FeeRecords } from '@/components/fees/FeeRecords';
 import { FeeStructure } from '@/components/fees/FeeStructure';
 
 export default function FeesPage() {
+  const [userRole, setUserRole] = useState('reception');
   const [activeTab, setActiveTab] = useState<'Overview' | 'Collect' | 'Records' | 'Structure'>('Overview');
+
+  React.useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u && u.role) {
+          setUserRole(u.role);
+          if (u.role === 'reception') setActiveTab('Collect');
+        }
+      }
+    } catch(e) {}
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-white animate-in fade-in duration-700">
       {/* 1. Page Header */}
       <div className="p-10 pb-0 bg-white">
-        <h1 className="text-4xl font-black text-text-slate tracking-tight leading-none mb-3">Fee Management</h1>
-        <p className="text-sm font-bold text-gray-400 mb-8">Track collections, manage student dues, and configure fee structures</p>
+        <h1 className="text-4xl font-black text-text-slate tracking-tight leading-none mb-3">
+          {userRole === 'reception' ? 'Fee Collection' : 'Fee Management'}
+        </h1>
+        <p className="text-sm font-bold text-gray-400 mb-8">
+          {userRole === 'reception' 
+            ? 'Collect student fees, search records, and generate receipts' 
+            : 'Track collections, manage student dues, and configure fee structures'}
+        </p>
         
         {/* 2. Tab Switcher */}
-        <FeeTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <FeeTabs 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          userRole={userRole} 
+        />
       </div>
 
       {/* 3. Tab Content Area */}
@@ -32,3 +56,4 @@ export default function FeesPage() {
     </div>
   );
 }
+

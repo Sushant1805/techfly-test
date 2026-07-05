@@ -9,28 +9,94 @@ import {
   Banknote, Receipt, ChevronRight,
   Info, AlertCircle, Plus, Users
 } from 'lucide-react';
-import { students, batches, feeRecords, FeeRecord, PaymentMode, FeeType } from '@/lib/mockData';
+import { FeeRecord, PaymentMode, FeeType } from '@/lib/mockData';
+import jsPDF from 'jspdf';
 
 export const CollectFee: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [students, setStudents] = useState<any[]>([]);
+  const [feeRecords, setFeeRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      if (!instituteSlug) return;
+
+      const [studentsRes, feesRes] = await Promise.all([
+        fetch(`/api/${instituteSlug}/students`),
+        fetch(`/api/${instituteSlug}/fees`)
+      ]);
+
+      const studentsData = await studentsRes.json();
+      const feesData = await feesRes.json();
+
+      if (studentsData.success) {
+        const mappedStudents = studentsData.students.map((s: any) => ({
+          id: s._id,
+          name: s.name,
+          rollNumber: s.rollNumber || 'N/A',
+          standard: s.standard || 'N/A',
+          batch: s.batchId ? s.batchId.name : 'Unassigned',
+          batchId: s.batchId ? s.batchId._id : '',
+          phone: s.phone,
+          email: s.email || '',
+          parentName: s.parentName || 'N/A',
+          parentPhone: s.parentPhone || 'N/A',
+          address: s.address || 'N/A',
+          status: s.status || 'Active', 
+          feesStatus: s.feesStatus || 'Pending', 
+          attendancePercent: s.attendancePercent !== undefined ? s.attendancePercent : 95,
+          totalFeesDue: s.totalFeesDue !== undefined ? s.totalFeesDue : (s.feesStatus === 'Paid' ? 0 : 4500)
+        }));
+        setStudents(mappedStudents);
+      }
+
+      if (feesData.success) {
+        const mappedFees = feesData.fees.map((f: any) => ({
+          id: f._id,
+          studentId: f.studentId?._id || '',
+          month: 'April 2026',
+          feeType: 'Monthly',
+          dueDate: f.dueDate,
+          balance: f.amount - (f.amountPaid || 0),
+          amount: f.amount,
+          amountPaid: f.amountPaid || 0,
+          status: f.status
+        }));
+        setFeeRecords(mappedFees);
+      }
+    } catch (error) {
+      console.error('Error fetching collect fee data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [isSuccess]);
   
-  const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [selectedStudentId]);
+  const selectedStudent = useMemo(() => students.find(s => s.id === selectedStudentId), [selectedStudentId, students]);
   
   const studentDues = useMemo(() => {
     if (!selectedStudentId) return [];
     return feeRecords.filter(r => r.studentId === selectedStudentId && (r.status === 'Pending' || r.status === 'Overdue' || r.status === 'Partial'));
-  }, [selectedStudentId]);
+  }, [selectedStudentId, feeRecords]);
 
   const searchResults = useMemo(() => {
     if (searchTerm.length < 2) return [];
     return students.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.phone.includes(searchTerm)
+      (s.phone && s.phone.includes(searchTerm))
     ).slice(0, 5);
-  }, [searchTerm]);
+  }, [searchTerm, students]);
 
   const [form, setForm] = useState<{
     feeType: FeeType;
@@ -66,16 +132,140 @@ export const CollectFee: React.FC = () => {
     setForm(prev => ({
       ...prev,
       month: due.month,
-      amountDue: due.balance,
-      amountPaying: due.balance,
+      amountDue: due.amount || due.balance, // Use the total fee amount as amountDue
+      amountPaying: due.balance, // Pay the remaining balance
       feeType: due.feeType
     }));
   };
 
-  const handleSave = () => {
-    setIsSuccess(true);
-    setTimeout(() => setIsSuccess(false), 3000);
-    // Logic would add to feeRecords in a real app
+  const generateInvoicePDF = (fee: any, student: any) => {
+    const doc = new jsPDF();
+    const receiptNumber = 'REC-' + fee._id.substring(0, 8).toUpperCase();
+    
+    // Header
+    doc.setFontSize(24);
+    doc.setTextColor(59, 130, 246);
+    doc.text('FEE RECEIPT', 105, 20, { align: 'center' });
+    
+    // Receipt Number
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Receipt #${receiptNumber}`, 105, 30, { align: 'center' });
+    
+    // Date
+    doc.setFontSize(10);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 105, 38, { align: 'center' });
+    
+    // Line separator
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 45, 190, 45);
+    
+    // Student Details Section
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Student Details', 20, 55);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Name: ${student.name}`, 20, 65);
+    doc.text(`Phone: ${student.phone}`, 20, 73);
+    doc.text(`Standard: ${student.standard || 'N/A'}`, 20, 81);
+    
+    // Payment Details Section
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Payment Details', 110, 55);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Amount Paid: ₹${fee.amountPaid?.toLocaleString() || fee.amount?.toLocaleString()}`, 110, 65);
+    doc.text(`Payment Mode: ${fee.paymentMode || 'N/A'}`, 110, 73);
+    doc.text(`Payment Date: ${fee.paymentDate || fee.dueDate}`, 110, 81);
+    
+    if (fee.transactionId) {
+      doc.text(`Transaction ID: ${fee.transactionId}`, 110, 89);
+    }
+    
+    // Amount Box
+    doc.setFillColor(248, 250, 252);
+    doc.rect(20, 95, 170, 30, 'F');
+    
+    doc.setFontSize(16);
+    doc.setTextColor(59, 130, 246);
+    doc.text(`TOTAL PAID: ₹${fee.amountPaid?.toLocaleString() || fee.amount?.toLocaleString()}`, 105, 115, { align: 'center' });
+    
+    // Status
+    doc.setFontSize(12);
+    doc.setTextColor(fee.status === 'Paid' ? 34 : 197, fee.status === 'Paid' ? 197 : 134, fee.status === 'Paid' ? 94 : 60);
+    doc.text(`Status: ${fee.status.toUpperCase()}`, 105, 125, { align: 'center' });
+    
+    // Notes
+    if (fee.notes) {
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Notes: ${fee.notes}`, 20, 140);
+    }
+    
+    // Footer
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text('This is a computer-generated receipt. No signature required.', 105, 280, { align: 'center' });
+    
+    // Save PDF
+    doc.save(`${receiptNumber}_${student.name.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const handleSave = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      if (!instituteSlug || !selectedStudentId) return;
+
+      // If amountDue is 0, treat amountPaying as the full fee amount
+      const totalAmount = form.amountDue && form.amountDue > 0 ? form.amountDue : form.amountPaying;
+      
+      const payload = {
+        studentId: selectedStudentId,
+        amount: form.amountPaying,
+        totalAmount: totalAmount,
+        paymentDate: form.date,
+        paymentMode: form.mode,
+        transactionId: form.mode === 'UPI' || form.mode === 'Bank Transfer' ? form.txnId : form.mode === 'Cheque' ? form.chequeNo : undefined,
+        notes: form.notes
+      };
+      
+      console.log('Sending fee collection payload:', payload);
+      console.log('Form state:', form);
+
+      const res = await fetch(`/api/${instituteSlug}/fees`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      console.log('Fee collection response:', result);
+      
+      if (result.success) {
+        setIsSuccess(true);
+        
+        // Generate and download PDF invoice
+        generateInvoicePDF(result.fee, result.student);
+        
+        // Refresh data to show updated dues
+        await fetchData();
+        setTimeout(() => setIsSuccess(false), 3000);
+      } else {
+        alert('Failed to save fee record: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error saving fee:', error);
+      alert('An error occurred while saving fee record.');
+    }
   };
 
   return (
@@ -115,7 +305,7 @@ export const CollectFee: React.FC = () => {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{s.batch} • {s.rollNumber}</p>
                   </div>
                 </div>
-                {s.totalFeesDue > 0 && <Badge variant="Inactive" className="px-3">₹{s.totalFeesDue.toLocaleString()} Due</Badge>}
+                {(s.totalFeesDue ?? 0) > 0 && <Badge variant="Inactive" className="px-3">₹{(s.totalFeesDue ?? 0).toLocaleString()} Due</Badge>}
               </button>
             ))}
           </div>
@@ -148,7 +338,7 @@ export const CollectFee: React.FC = () => {
             <div className="mt-10 pt-8 border-t border-gray-50 grid grid-cols-3 gap-8">
               <div>
                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1.5">Outstanding Balance</p>
-                <p className={`text-2xl font-black ${selectedStudent.totalFeesDue > 0 ? 'text-red-500' : 'text-green-500'}`}>₹{selectedStudent.totalFeesDue.toLocaleString()}</p>
+                <p className={`text-2xl font-black ${(selectedStudent.totalFeesDue ?? 0) > 0 ? 'text-red-500' : 'text-green-500'}`}>₹{(selectedStudent.totalFeesDue ?? 0).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1.5">Last Payment</p>
@@ -156,7 +346,7 @@ export const CollectFee: React.FC = () => {
                 <p className="text-[9px] font-black text-brand-blue uppercase">Receipt #RCP-042</p>
               </div>
               <div className="flex flex-col items-end justify-center">
-                {selectedStudent.totalFeesDue === 0 ? (
+                {(selectedStudent.totalFeesDue ?? 0) === 0 ? (
                   <Badge variant="Active" className="px-6 py-2 rounded-xl text-[10px] uppercase font-black bg-green-500 text-white shadow-lg shadow-green-100 border-none">All Clear ✓</Badge>
                 ) : (
                   <Badge variant="Inactive" className="px-6 py-2 rounded-xl text-[10px] uppercase font-black bg-red-500 text-white shadow-lg shadow-red-100 border-none">Dues Pending</Badge>
@@ -244,7 +434,16 @@ export const CollectFee: React.FC = () => {
                         type="number" 
                         className="w-full h-14 rounded-2xl border border-gray-100 bg-bg-soft/20 pl-10 pr-6 text-lg font-black focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
                         value={form.amountPaying}
-                        onChange={(e) => setForm(prev => ({ ...prev, amountPaying: Number(e.target.value) }))}
+                        onChange={(e) => setForm(prev => ({ 
+                          ...prev, 
+                          amountPaying: Number(e.target.value)
+                        }))}
+                        onBlur={(e) => {
+                          // Only set amountDue when user leaves the field if it's still 0
+                          if (form.amountDue === 0) {
+                            setForm(prev => ({ ...prev, amountDue: Number(e.target.value) }));
+                          }
+                        }}
                       />
                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-lg font-black text-gray-300">₹</span>
                       {form.amountDue > 0 && form.amountPaying < form.amountDue && (

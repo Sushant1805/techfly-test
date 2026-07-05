@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -10,13 +10,56 @@ import {
   Calendar, CreditCard, Banknote, Landmark,
   ChevronLeft, ChevronRight, Receipt
 } from 'lucide-react';
-import { feeRecords, FeeStatus, PaymentMode, FeeType } from '@/lib/mockData';
+import { FeeStatus, PaymentMode, FeeType } from '@/lib/mockData';
 
 export const FeeRecords: React.FC = () => {
+  const [feeRecords, setFeeRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBatch, setFilterBatch] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchFees = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+
+        const res = await fetch(`/api/${instituteSlug}/fees`);
+        const data = await res.json();
+        console.log('FeeRecords API response:', data);
+        if (data.success) {
+          const mapped = data.fees.map((f: any) => ({
+            id: f._id,
+            receiptNumber: 'REC-' + f._id.substring(0, 5).toUpperCase(),
+            studentName: f.studentId?.name || 'Unknown',
+            rollNumber: 'N/A',
+            batchName: 'Batch A', // Placeholder
+            standard: '10th', // Placeholder
+            month: 'October', // Placeholder
+            amount: f.amount,
+            amountPaid: f.amountPaid || 0,
+            balance: f.amount - (f.amountPaid || 0),
+            status: f.status,
+            paymentMode: f.paymentMode,
+            paymentDate: f.paymentDate,
+            transactionId: f.transactionId,
+            date: f.dueDate
+          }));
+          console.log('Mapped fee records:', mapped.slice(0, 3));
+          setFeeRecords(mapped);
+        }
+      } catch (error) {
+        console.error('Error fetching fees:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFees();
+  }, []);
 
   const filteredRecords = useMemo(() => {
     return feeRecords.filter(r => {
@@ -26,7 +69,8 @@ export const FeeRecords: React.FC = () => {
       const matchesStatus = filterStatus === 'All' || r.status === filterStatus;
       return matchesSearch && matchesBatch && matchesStatus;
     });
-  }, [searchTerm, filterBatch, filterStatus]);
+  }, [searchTerm, filterBatch, filterStatus, feeRecords]);
+
 
   const summary = useMemo(() => {
     const collected = filteredRecords.reduce((acc, r) => acc + r.amountPaid, 0);
@@ -174,12 +218,16 @@ export const FeeRecords: React.FC = () => {
                   <td className="pr-10 text-right">
                     <div className="flex items-center justify-end gap-1 group-hover:opacity-100 transition-opacity">
                       {record.status === 'Paid' ? (
-                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-gray-300 hover:text-brand-blue"><Eye className="w-4 h-4" /></Button>
+                        <>
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-gray-300 hover:text-brand-blue" title="View Details"><Eye className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-gray-300 hover:text-brand-blue" title="Print Receipt"><Receipt className="w-4 h-4" /></Button>
+                        </>
                       ) : (
-                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-brand-blue hover:bg-brand-blue/5"><Plus className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-brand-blue hover:bg-brand-blue/5" title="Collect Fee"><Plus className="w-4 h-4" /></Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-gray-300 hover:text-text-slate"><MoreVertical className="w-4 h-4" /></Button>
                     </div>
+
                   </td>
                 </tr>
               ))}

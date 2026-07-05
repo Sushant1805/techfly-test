@@ -14,7 +14,162 @@ import { subjectsMock, batches } from '@/lib/mockData';
 /**
  * Create Test Modal
  */
-export const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void; onSuccess?: (msg: string) => void; onError?: (msg: string) => void; initialBatchId?: string }> = ({ isOpen, onClose, onSuccess, onError, initialBatchId }) => {
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState(subjectsMock[0]?.name || 'Maths');
+  const [batchId, setBatchId] = useState('');
+  const [testType, setTestType] = useState('Chapter Test');
+  const [maxMarks, setMaxMarks] = useState('100');
+  const [passingMarks, setPassingMarks] = useState('40');
+  const [duration, setDuration] = useState('60');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startTime, setStartTime] = useState('09:00');
+  const [venue, setVenue] = useState('Room 101');
+  const [syllabus, setSyllabus] = useState('');
+  const [notifySMS, setNotifySMS] = useState(true);
+  const [batchesList, setBatchesList] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setTitle('');
+      setSubject(subjectsMock[0]?.name || 'Maths');
+      setBatchId('');
+      setTestType('Chapter Test');
+      setMaxMarks('100');
+      setPassingMarks('40');
+      setDuration('60');
+      setDate(new Date().toISOString().split('T')[0]);
+      setStartTime('09:00');
+      setVenue('Room 101');
+      setSyllabus('');
+      setErrorMsg('');
+    }
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+        console.log('User object:', user);
+        console.log('Fetching batches for instituteSlug:', instituteSlug);
+        if (instituteSlug) {
+          fetch(`/api/${instituteSlug}/batches`)
+            .then(res => {
+              console.log('Batches API response status:', res.status);
+              return res.json();
+            })
+            .then(data => {
+              console.log('Batches API response data:', data);
+              if (data.success) {
+                console.log('Setting batchesList with', data.batches.length, 'batches');
+                setBatchesList(data.batches);
+                if (initialBatchId && data.batches.some((batch: any) => batch._id === initialBatchId)) {
+                  setBatchId(initialBatchId);
+                } else if (data.batches.length > 0) {
+                  setBatchId(data.batches[0]._id);
+                }
+              } else {
+                console.error('Batches API returned success:false:', data.message);
+              }
+            })
+            .catch(err => console.error('Error fetching batches:', err));
+        } else {
+          console.error('No instituteSlug found in user object');
+        }
+      } catch (err) {
+        console.error('Error loading batches:', err);
+      }
+    } else {
+      console.error('No user found in localStorage');
+    }
+  }, [isOpen]);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      setErrorMsg('Test Title is required');
+      return;
+    }
+    if (!batchId) {
+      setErrorMsg('Target Batch is required');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        setErrorMsg('User session not found');
+        setSubmitting(false);
+        return;
+      }
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      if (!instituteSlug) {
+        setErrorMsg('Institute details not found');
+        setSubmitting(false);
+        return;
+      }
+
+      const bodyData = {
+        title,
+        subject,
+        batchId,
+        testType,
+        maxMarks: Number(maxMarks),
+        passingMarks: Number(passingMarks),
+        duration: Number(duration),
+        date,
+        startTime,
+        venue,
+        syllabus,
+        teacher: user._id || user.id || undefined
+      };
+
+      console.log('Creating test with data:', bodyData);
+
+      const res = await fetch(`/api/${instituteSlug}/tests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const result = await res.json();
+      console.log('Test creation response:', result);
+      if (result.success) {
+        if (onSuccess) {
+          onSuccess('Test created successfully!');
+        } else {
+          onClose();
+        }
+      } else {
+        const errorMsg = result.message || result.error || 'Failed to create test';
+        setErrorMsg(errorMsg);
+        if (onError) {
+          onError(errorMsg);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error saving test:', err);
+      const errorMsg = err.message || 'An error occurred while saving test';
+      setErrorMsg(errorMsg);
+      if (onError) {
+        onError(errorMsg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -38,26 +193,125 @@ export const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void }>
 
         {/* Body */}
         <div className="p-10 space-y-8 max-h-[70vh] overflow-y-auto scrollbar-hide">
+          {errorMsg && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-semibold">
+              {errorMsg}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-8">
-            <InputField label="Test Title *" placeholder="e.g. Algebra Unit 3" />
-            <SelectField label="Subject *" options={subjectsMock.map(s => s.name)} />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Test Title *</label>
+              <input 
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                placeholder="e.g. Algebra Unit 3"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Subject *</label>
+              <select 
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all appearance-none cursor-pointer"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              >
+                {subjectsMock.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-8">
-            <SelectField label="Target Batch *" options={batches.map(b => b.name)} />
-            <SelectField label="Test Type *" options={["Chapter Test", "Unit Test", "Mid-term", "Final Exam", "Quiz"]} />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Batch *</label>
+              <select 
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all appearance-none cursor-pointer"
+                value={batchId}
+                onChange={(e) => setBatchId(e.target.value)}
+              >
+                {batchesList.length === 0 ? (
+                  <option value="">No batches available</option>
+                ) : (
+                  batchesList.map(b => <option key={b._id} value={b._id}>{b.name} ({b.standard})</option>)
+                )}
+              </select>
+              {batchesList.length === 0 && (
+                <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mt-1">Please create batches first</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Test Type *</label>
+              <select 
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all appearance-none cursor-pointer"
+                value={testType}
+                onChange={(e) => setTestType(e.target.value)}
+              >
+                {["Chapter Test", "Unit Test", "Mid-term", "Final Exam", "Quiz"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-8 pt-4 border-t border-gray-50">
-             <InputField label="Total Marks *" placeholder="100" type="number" />
-             <InputField label="Passing Marks *" placeholder="40" type="number" />
-             <InputField label="Duration (min) *" placeholder="60" type="number" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Total Marks *</label>
+              <input 
+                type="number"
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                placeholder="100"
+                value={maxMarks}
+                onChange={(e) => setMaxMarks(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Passing Marks *</label>
+              <input 
+                type="number"
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                placeholder="40"
+                value={passingMarks}
+                onChange={(e) => setPassingMarks(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Duration (min) *</label>
+              <input 
+                type="number"
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                placeholder="60"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-6 pt-4">
-             <InputField label="Date *" type="date" value="2026-04-16" />
-             <InputField label="Starting Time *" type="time" value="09:00" />
-             <InputField label="Venue *" placeholder="Room 101" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date *</label>
+              <input 
+                type="date"
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Starting Time *</label>
+              <input 
+                type="time"
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Venue *</label>
+              <input 
+                className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 px-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all"
+                placeholder="Room 101"
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -65,6 +319,8 @@ export const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void }>
             <textarea 
               className="w-full h-24 rounded-2xl bg-bg-soft/20 border border-gray-100 p-6 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-brand-blue/10 transition-all resize-none"
               placeholder="e.g. Chapter 3: Laws of Motion, Chapter 4: Static Friction..."
+              value={syllabus}
+              onChange={(e) => setSyllabus(e.target.value)}
             />
           </div>
         </div>
@@ -72,15 +328,23 @@ export const CreateTestModal: React.FC<{ isOpen: boolean; onClose: () => void }>
         {/* Footer */}
         <div className="p-10 pt-6 bg-bg-soft/10 border-t border-gray-50 flex items-center justify-between">
            <div className="flex items-center gap-3">
-              <div className={`w-10 h-6 rounded-full p-1 bg-brand-blue`}>
-                 <div className={`w-4 h-4 rounded-full bg-white translate-x-6`} />
-              </div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notify Students via SMS</span>
+              <button 
+                type="button"
+                onClick={() => setNotifySMS(!notifySMS)}
+                className={`w-10 h-6 rounded-full p-1 transition-all ${notifySMS ? 'bg-brand-blue' : 'bg-gray-200'}`}
+              >
+                 <div className={`w-4 h-4 rounded-full bg-white transition-all ${notifySMS ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => setNotifySMS(!notifySMS)}>Notify Students via SMS</span>
            </div>
            <div className="flex items-center gap-4">
-             <Button variant="ghost" className="h-14 px-8 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest" onClick={onClose}>Discard</Button>
-             <Button className="h-14 px-10 rounded-2xl bg-brand-blue shadow-xl shadow-brand-blue/30 font-black text-xs uppercase tracking-[0.2em] gap-3">
-                <Plus className="w-5 h-5" /> Schedule Test
+             <Button variant="ghost" className="h-14 px-8 rounded-2xl text-gray-400 font-black uppercase text-[10px] tracking-widest" onClick={onClose} disabled={submitting}>Discard</Button>
+             <Button 
+               onClick={handleSave}
+               disabled={submitting}
+               className="h-14 px-10 rounded-2xl bg-brand-blue shadow-xl shadow-brand-blue/30 font-black text-xs uppercase tracking-[0.2em] gap-3"
+             >
+                {submitting ? 'Scheduling...' : <><Plus className="w-5 h-5" /> Schedule Test</>}
              </Button>
            </div>
         </div>

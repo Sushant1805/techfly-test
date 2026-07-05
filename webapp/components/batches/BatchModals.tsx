@@ -15,13 +15,122 @@ interface ModalProps {
 // --- 1. Create/Edit Batch Modal ---
 interface CreateEditBatchModalProps extends ModalProps {
   batch?: Batch | null;
+  onSuccess?: (msg: string) => void;
 }
 
-export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOpen, onClose, title, batch }) => {
+export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOpen, onClose, title, batch, onSuccess }) => {
+  const [name, setName] = useState('');
+  const [standard, setStandard] = useState('Std 9');
+  const [capacity, setCapacity] = useState('30');
+  const [teacherId, setTeacherId] = useState('');
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [scheduleSlots, setScheduleSlots] = useState(batch?.schedule || [{ day: 'Monday', startTime: '08:00', endTime: '10:00' }]);
 
   const addSlot = () => setScheduleSlots([...scheduleSlots, { day: 'Monday', startTime: '08:00', endTime: '10:00' }]);
   const removeSlot = (index: number) => setScheduleSlots(scheduleSlots.filter((_, i) => i !== index));
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(batch?.name || '');
+      setStandard(batch?.standard || 'Std 9');
+      setCapacity(batch?.capacity?.toString() || '30');
+      setTeacherId(batch?.teacherId || '');
+      setScheduleSlots(batch?.schedule || [{ day: 'Monday', startTime: '08:00', endTime: '10:00' }]);
+      setErrorMsg('');
+    }
+  }, [isOpen, batch]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+        if (instituteSlug) {
+          fetch(`/api/${instituteSlug}/staff?role=Teacher`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                setTeachersList(data.staff);
+              }
+            })
+            .catch(err => console.error('Error fetching teachers:', err));
+        }
+      } catch (err) {
+        console.error('Error parsing user or fetching teachers:', err);
+      }
+    }
+  }, [isOpen]);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setErrorMsg('Batch Name is required');
+      return;
+    }
+    if (!capacity.trim() || isNaN(Number(capacity))) {
+      setErrorMsg('Valid Capacity is required');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        setErrorMsg('User session not found');
+        setSubmitting(false);
+        return;
+      }
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      if (!instituteSlug) {
+        setErrorMsg('Institute details not found');
+        setSubmitting(false);
+        return;
+      }
+
+      const bodyData = {
+        name,
+        standard,
+        capacity: Number(capacity),
+        teacher: teacherId || undefined,
+      };
+
+      const url = batch 
+        ? `/api/${instituteSlug}/batches/${batch.id}` 
+        : `/api/${instituteSlug}/batches`;
+      
+      const method = batch ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        if (onSuccess) {
+          onSuccess(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
+        } else {
+          onClose();
+        }
+      } else {
+        setErrorMsg(result.message || 'Failed to save batch');
+      }
+    } catch (err: any) {
+      console.error('Error saving batch:', err);
+      setErrorMsg(err.message || 'An error occurred while saving batch');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -39,16 +148,31 @@ export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOp
         </div>
         
         <div className="p-10 space-y-12">
+          {errorMsg && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-semibold">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Section 1: Basic Details */}
           <div className="space-y-6">
             <h4 className="text-[10px] font-black text-brand-blue uppercase tracking-[0.3em] px-2 flex items-center gap-2">
               <span className="w-4 h-0.5 bg-brand-blue" /> Basic Information
             </h4>
             <div className="grid grid-cols-2 gap-6">
-              <Input label="Batch Name *" placeholder="e.g. Batch F" defaultValue={batch?.name} />
+              <Input 
+                label="Batch Name *" 
+                placeholder="e.g. Batch F" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+              />
               <div className="space-y-2">
                 <label className="text-xs font-black text-text-slate ml-1 uppercase tracking-widest">Standard / Class *</label>
-                <select className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 py-2 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all hover:border-brand-blue/20">
+                <select 
+                  className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 py-2 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all hover:border-brand-blue/20"
+                  value={standard}
+                  onChange={(e) => setStandard(e.target.value)}
+                >
                   {['Std 9', 'Std 10', 'Std 11', 'Std 12'].map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -68,7 +192,13 @@ export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOp
               <Input label="Room / Location" placeholder="e.g. Room 101" defaultValue={batch?.room} />
             </div>
             <div className="grid grid-cols-3 gap-6">
-              <Input label="Capacity *" type="number" placeholder="40" defaultValue={batch?.capacity} />
+              <Input 
+                label="Capacity *" 
+                type="number" 
+                placeholder="40" 
+                value={capacity} 
+                onChange={(e) => setCapacity(e.target.value)} 
+              />
               <Input label="Monthly Fees (₹) *" type="number" placeholder="4500" defaultValue={batch?.fees} />
               <Input label="Start Date *" type="date" defaultValue={batch?.startDate} />
             </div>
@@ -80,10 +210,14 @@ export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOp
               <span className="w-4 h-0.5 bg-brand-blue" /> Assign Teacher
             </h4>
             <div className="space-y-3">
-              <select className="flex h-14 w-full rounded-2xl border border-gray-100 bg-white px-4 py-2 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all hover:border-brand-blue/20">
+              <select 
+                className="flex h-14 w-full rounded-2xl border border-gray-100 bg-white px-4 py-2 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all hover:border-brand-blue/20"
+                value={teacherId}
+                onChange={(e) => setTeacherId(e.target.value)}
+              >
                 <option value="">Select Teacher</option>
-                {teachers.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} ({t.subjects.join(', ')})</option>
+                {teachersList.map((t: any) => (
+                  <option key={t._id} value={t._id}>{t.name}</option>
                 ))}
               </select>
               <button className="text-[10px] font-black text-brand-blue uppercase tracking-widest ml-2 hover:underline">Can't find teacher? Add new teacher</button>
@@ -125,9 +259,9 @@ export const CreateEditBatchModal: React.FC<CreateEditBatchModalProps> = ({ isOp
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-50 p-10 flex items-center justify-end gap-4">
-          <Button variant="ghost" onClick={onClose} className="font-black uppercase tracking-widest text-xs h-14 px-10 rounded-2xl">Cancel</Button>
-          <Button onClick={onClose} className="font-black uppercase tracking-widest text-xs h-14 px-12 rounded-2xl shadow-brand-blue/20">
-            {batch ? 'Save Changes' : 'Create Batch'}
+          <Button variant="ghost" onClick={onClose} disabled={submitting} className="font-black uppercase tracking-widest text-xs h-14 px-10 rounded-2xl">Cancel</Button>
+          <Button onClick={handleSave} disabled={submitting} className="font-black uppercase tracking-widest text-xs h-14 px-12 rounded-2xl shadow-brand-blue/20">
+            {submitting ? 'Saving...' : batch ? 'Save Changes' : 'Create Batch'}
           </Button>
         </div>
       </Card>

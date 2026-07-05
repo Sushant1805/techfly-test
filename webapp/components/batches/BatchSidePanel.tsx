@@ -15,6 +15,7 @@ interface BatchSidePanelProps {
   onClose: () => void;
   onEdit: (batch: Batch) => void;
   onAddStudent: (batch: Batch) => void;
+  onCreateTest: (batch: Batch) => void;
 }
 
 type TabType = 'Overview' | 'Students' | 'Attendance' | 'Schedule' | 'Tests' | 'Notes';
@@ -24,7 +25,8 @@ export const BatchSidePanel: React.FC<BatchSidePanelProps> = ({
   isOpen, 
   onClose, 
   onEdit, 
-  onAddStudent 
+  onAddStudent,
+  onCreateTest
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('Overview');
 
@@ -79,11 +81,11 @@ export const BatchSidePanel: React.FC<BatchSidePanelProps> = ({
             <p className="text-sm font-bold text-gray-400 flex flex-wrap items-center gap-2 tracking-tight">
               <span>{batch.standard}</span>
               <span className="w-1 h-1 rounded-full bg-gray-300" />
-              <span>{batch.schedule.map(s => s.day.substring(0, 3)).join('/')}</span>
+              <span>{(batch.schedule || []).map(s => (s.day || '').substring(0, 3)).join('/')}</span>
               <span className="w-1 h-1 rounded-full bg-gray-300" />
-              <span>{batch.schedule[0].startTime}–{batch.schedule[0].endTime} AM</span>
+              <span>{batch.schedule?.[0]?.startTime || '10:00'}–{batch.schedule?.[0]?.endTime || '12:00'} AM</span>
               <span className="w-1 h-1 rounded-full bg-gray-300" />
-              <span>{batch.room}</span>
+              <span>{batch.room || 'Room 101'}</span>
             </p>
           </div>
           
@@ -124,7 +126,7 @@ export const BatchSidePanel: React.FC<BatchSidePanelProps> = ({
             {activeTab === 'Students' && <StudentsTab batch={batch} onAddStudent={() => onAddStudent(batch)} />}
             {activeTab === 'Attendance' && <AttendanceTab batch={batch} />}
             {activeTab === 'Schedule' && <ScheduleTab batch={batch} />}
-            {activeTab === 'Tests' && <TestsTab batch={batch} />}
+            {activeTab === 'Tests' && <TestsTab batch={batch} onCreateTest={() => onCreateTest(batch)} />}
             {activeTab === 'Notes' && <NotesTab batch={batch} />}
           </div>
         </div>
@@ -146,7 +148,7 @@ const OverviewTab = ({ batch }: { batch: Batch }) => {
           <DetailItem label="Standard" value={batch.standard} />
           <DetailItem label="Room" value={batch.room} />
           <DetailItem label="Start Date" value={batch.startDate} />
-          <DetailItem label="Monthly Fees" value={`₹${batch.fees.toLocaleString()}`} />
+          <DetailItem label="Monthly Fees" value={`₹${(batch.fees || 0).toLocaleString()}`} />
           <DetailItem label="Status" value={batch.status} />
         </div>
       </section>
@@ -156,24 +158,28 @@ const OverviewTab = ({ batch }: { batch: Batch }) => {
         <h4 className="text-xs font-black text-brand-blue uppercase tracking-[0.2em] px-2">Assigned Teacher</h4>
         <div className="p-6 rounded-[28px] border border-gray-100 bg-white shadow-soft flex items-start gap-6 group hover:shadow-soft-lg transition-all">
           <div className="w-16 h-16 rounded-[20px] bg-brand-blue/10 text-brand-blue flex items-center justify-center font-black text-2xl group-hover:scale-105 transition-transform">
-            {batch.teacher.name.charAt(0)}
+            {(batch.teacher?.name || 'U').charAt(0)}
           </div>
           <div className="flex-1 space-y-4">
             <div>
-              <p className="text-lg font-black text-text-slate leading-none mb-2">{batch.teacher.name}</p>
+              <p className="text-lg font-black text-text-slate leading-none mb-2">{batch.teacher?.name || 'Unassigned'}</p>
               <div className="flex flex-wrap gap-1.5">
-                {batch.teacher.subjects.map(s => (
+                {(batch.teacher?.subjects || []).map(s => (
                   <span key={s} className="px-2 py-0.5 rounded-lg bg-bg-soft text-[9px] font-black text-gray-500 uppercase tracking-tighter">{s}</span>
                 ))}
               </div>
             </div>
             <div className="flex items-center gap-6 pt-2 border-t border-gray-50">
-              <a href={`tel:${batch.teacher.phone}`} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-brand-blue transition-colors">
-                <Phone className="w-3.5 h-3.5" /> {batch.teacher.phone}
-              </a>
-              <a href={`mailto:${batch.teacher.email}`} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-brand-blue transition-colors">
-                <Mail className="w-3.5 h-3.5" /> {batch.teacher.name.toLowerCase().split(' ')[0]}@ezzy.in
-              </a>
+              {batch.teacher?.phone && (
+                <a href={`tel:${batch.teacher.phone}`} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-brand-blue transition-colors">
+                  <Phone className="w-3.5 h-3.5" /> {batch.teacher.phone}
+                </a>
+              )}
+              {batch.teacher?.email && (
+                <a href={`mailto:${batch.teacher.email}`} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-brand-blue transition-colors">
+                  <Mail className="w-3.5 h-3.5" /> {batch.teacher.email}
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -183,8 +189,8 @@ const OverviewTab = ({ batch }: { batch: Batch }) => {
       <div className="grid grid-cols-2 gap-4">
         <StatCard label="Total Students" value={batch.totalStudents} color="text-text-slate" />
         <StatCard label="Avg Attendance" value={`${batch.averageAttendance}%`} color="text-brand-blue" />
-        <StatCard label="Fees Collected" value={`₹${(batch.fees * batch.totalStudents * 0.95).toLocaleString()}`} color="text-green-500" />
-        <StatCard label="Upcoming Test" value={batch.upcomingTest?.date.split('-').slice(1).reverse().join('/') || 'N/A'} color="text-amber-500" />
+        <StatCard label="Fees Collected" value={`₹${((batch.fees || 0) * (batch.totalStudents || 0) * 0.95).toLocaleString()}`} color="text-green-500" />
+        <StatCard label="Upcoming Test" value={batch.upcomingTest?.date ? batch.upcomingTest.date.split('-').slice(1).reverse().join('/') : 'N/A'} color="text-amber-500" />
       </div>
 
       {/* Capacity Gauge */}
@@ -209,7 +215,7 @@ const OverviewTab = ({ batch }: { batch: Batch }) => {
       <section className="space-y-4">
         <h4 className="text-xs font-black text-brand-blue uppercase tracking-[0.2em] px-2">Subjects Covered</h4>
         <div className="flex flex-wrap gap-2">
-          {batch.subjects.map(s => {
+          {(batch.subjects || []).map(s => {
             const colors = subjectColors[s] || { bg: '#f3f4f6', text: '#4b5563', border: '#e5e7eb' };
             return (
               <span 
@@ -326,7 +332,7 @@ const AttendanceTab = ({ batch }: { batch: Batch }) => {
           </div>
           <div className="divide-y divide-gray-50 h-[300px] overflow-y-auto no-scrollbar">
             {demoStudents.map(s => {
-              const scheduleDays = batch.schedule.map(slot => slot.day.substring(0, 3));
+              const scheduleDays = (batch.schedule || []).map(slot => (slot.day || '').substring(0, 3));
               return (
                 <div key={s.id} className="grid grid-cols-8 h-12 items-center text-center hover:bg-bg-soft/30 transition-colors">
                   <div className="col-span-2 text-left pl-6">
@@ -368,7 +374,7 @@ const ScheduleTab = ({ batch }: { batch: Batch }) => {
         </div>
         <div className="space-y-3">
           {days.map(day => {
-            const slot = batch.schedule.find(s => s.day === day);
+            const slot = (batch.schedule || []).find(s => s.day === day);
             return (
               <div key={day} className={`p-5 rounded-2xl border transition-all flex items-center justify-between ${slot ? 'bg-white border-brand-blue/10 shadow-soft' : 'bg-bg-soft/20 border-transparent opacity-40'}`}>
                 <div className="flex items-center gap-4">
@@ -417,12 +423,17 @@ const UpcomingClassCard = ({ date, subject, time, room }: { date: string; subjec
 );
 
 // --- Tab: Tests ---
-const TestsTab = ({ batch }: { batch: Batch }) => (
+const TestsTab = ({ batch, onCreateTest }: { batch: Batch, onCreateTest: () => void }) => (
   <div className="space-y-12">
     <section className="space-y-6">
       <div className="flex items-center justify-between px-2">
         <h4 className="text-xs font-black text-brand-blue uppercase tracking-[0.2em]">Tests & Marks</h4>
-        <Button variant="default" size="sm" className="h-9 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 shadow-brand-blue/10">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onCreateTest}
+          className="h-9 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 shadow-brand-blue/10"
+        >
           <Plus className="w-3.5 h-3.5" /> Create Test
         </Button>
       </div>

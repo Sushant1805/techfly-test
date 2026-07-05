@@ -1,8 +1,8 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { Search } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, CheckCircle2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { batches, Batch, teachers } from '@/lib/mockData';
+import { Batch, teachers } from '@/lib/mockData';
 import { BatchesToolbar } from '@/components/batches/BatchesToolbar';
 import { BatchCard } from '@/components/batches/BatchCard';
 import { BatchTable } from '@/components/batches/BatchTable';
@@ -14,9 +14,12 @@ import {
   BatchStatusModal, 
   EditScheduleModal 
 } from '@/components/batches/BatchModals';
+import { CreateTestModal } from '@/components/tests/TestModals';
 
 export default function Batches() {
   // --- State ---
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     standard: 'All Standards',
@@ -26,11 +29,88 @@ export default function Batches() {
   const [viewMode, setViewMode] = useState<'Grid' | 'List'>('Grid');
   const [activeBatch, setActiveBatch] = useState<Batch | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  
-  // Modal states
-  const [modalType, setModalType] = useState<'Create' | 'Edit' | 'ManageStudents' | 'Delete' | 'Status' | 'Schedule' | null>(null);
+  const [modalType, setModalType] = useState<string | null>(null);
   const [targetedBatch, setTargetedBatch] = useState<Batch | null>(null);
-  const [statusType, setStatusType] = useState<'Full' | 'Inactive'>('Full');
+  const [statusType, setStatusType] = useState<'Full' | 'Inactive' | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isCreateTestOpen, setIsCreateTestOpen] = useState(false);
+  const [createTestBatchId, setCreateTestBatchId] = useState('');
+  
+  const [userRole, setUserRole] = useState('teacher');
+  const [userId, setUserId] = useState('');
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+        setUserRole(user.role);
+        setUserId(user.id);
+
+        const res = await fetch(`/api/${instituteSlug}/batches`);
+        const data = await res.json();
+        if (data.success) {
+          const mapped = data.batches.map((b: any) => ({
+            id: b._id,
+            name: b.name,
+            standard: b.standard,
+            subject: b.subject || 'All Subjects',
+            subjects: b.subjects || [b.subject || 'All Subjects'],
+            teacherId: b.teacher?._id,
+            teacher: {
+              id: b.teacher?._id || '',
+              name: b.teacher?.name || 'Unassigned',
+              avatar: 'https://i.pravatar.cc/150?u=' + b.teacher?._id,
+              phone: b.teacher?.phone || '9876543210',
+              email: b.teacher?.email || 'teacher@ezzycoach.in',
+              subjects: b.teacher?.subjects || [b.subject || 'All Subjects'],
+            },
+            status: b.status || 'Active',
+            totalStudents: b.totalStudents || 0,
+            capacity: b.capacity || 30,
+            schedule: b.schedule && b.schedule.length > 0 ? b.schedule.map((s: any) => ({
+              day: s.day || 'Monday',
+              startTime: s.startTime || '10:00',
+              endTime: s.endTime || '12:00'
+            })) : [
+              { day: 'Monday', startTime: '10:00', endTime: '12:00' },
+              { day: 'Wednesday', startTime: '10:00', endTime: '12:00' }
+            ],
+            nextClass: b.nextClass || 'Tomorrow, 10:00 AM',
+            progress: b.progress || 45,
+            room: b.room || 'Room 101',
+            startDate: b.startDate || '2026-06-01',
+            fees: b.fees || 4500,
+            color: b.color || '#5E4E99',
+            attendanceToday: b.attendanceToday || 0,
+            averageAttendance: b.averageAttendance || 90,
+            lastClassDate: b.lastClassDate || '2026-06-25',
+            upcomingTest: b.upcomingTest || null,
+            notes: b.notes || 'No notes yet'
+          }));
+          
+          // Filter if teacher
+          if (user.role === 'teacher') {
+            setBatches(mapped.filter((b: any) => b.teacherId === user.id));
+          } else {
+            setBatches(mapped);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching batches:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBatches();
+  }, [modalType]);
 
   // --- Derived Data ---
   const filteredBatches = useMemo(() => {
@@ -46,7 +126,7 @@ export default function Batches() {
 
       return matchesSearch && matchesStandard && matchesStatus && matchesTeacher;
     });
-  }, [searchTerm, filters]);
+  }, [searchTerm, filters, batches]);
 
   const summaryData = useMemo(() => ({
     total: filteredBatches.length,
@@ -64,6 +144,7 @@ export default function Batches() {
   };
 
   const handleOpenModal = (type: any, batch?: Batch, status?: 'Full' | 'Inactive') => {
+    if (userRole === 'teacher') return;
     setTargetedBatch(batch || null);
     setModalType(type);
     if (status) setStatusType(status);
@@ -71,10 +152,13 @@ export default function Batches() {
 
   const handleBatchAction = (batch: Batch, action: string) => {
     if (action === 'menu') {
-      // Placeholder for context menu logic if needed, 
-      // for now we'll just open the side panel or edit
       handleOpenSidePanel(batch);
     }
+  };
+
+  const handleCreateTest = (batch: Batch) => {
+    setCreateTestBatchId(batch.id);
+    setIsCreateTestOpen(true);
   };
 
   return (
@@ -84,8 +168,12 @@ export default function Batches() {
         <div className="p-8 space-y-10">
           {/* Header Area */}
           <div>
-            <h1 className="text-4xl font-black text-text-slate tracking-tight leading-none mb-3">Batches</h1>
-            <p className="text-sm font-bold text-gray-400">Manage schedules, teachers and student assignments</p>
+            <h1 className="text-4xl font-black text-text-slate tracking-tight leading-none mb-3">
+              {userRole === 'teacher' ? 'Your Batches' : 'Batches'}
+            </h1>
+            <p className="text-sm font-bold text-gray-400">
+              {userRole === 'teacher' ? 'Your assigned schedules and student lists' : 'Manage schedules, teachers and student assignments'}
+            </p>
           </div>
 
           <BatchesToolbar 
@@ -95,9 +183,10 @@ export default function Batches() {
             onFilterChange={(name, value) => setFilters(f => ({ ...f, [name]: value }))}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            onCreateClick={() => handleOpenModal('Create')}
-            teachers={teacherNames}
+            onCreateClick={userRole === 'teacher' ? () => {} : () => handleOpenModal('Create')}
+            teachers={userRole === 'teacher' ? [] : teacherNames}
           />
+
 
           {/* Summary Strip */}
           <div className="flex flex-wrap items-center gap-4">
@@ -141,6 +230,7 @@ export default function Batches() {
         onClose={() => setIsPanelOpen(false)}
         onEdit={(b) => handleOpenModal('Edit', b)}
         onAddStudent={(b) => handleOpenModal('ManageStudents', b)}
+        onCreateTest={handleCreateTest}
       />
 
       {/* Modals Layer */}
@@ -149,35 +239,65 @@ export default function Batches() {
         onClose={() => setModalType(null)}
         title={modalType === 'Create' ? 'Create New Batch' : `Edit Batch — ${targetedBatch?.name}`}
         batch={targetedBatch}
+        onSuccess={(msg) => {
+          setModalType(null);
+          showToast(msg);
+        }}
       />
 
+
+      <CreateTestModal
+        isOpen={isCreateTestOpen}
+        initialBatchId={createTestBatchId}
+        onClose={() => {
+          setIsCreateTestOpen(false);
+          setCreateTestBatchId('');
+        }}
+        onSuccess={(msg) => {
+          setIsCreateTestOpen(false);
+          setCreateTestBatchId('');
+          showToast(msg);
+        }}
+      />
       {targetedBatch && (
         <>
           <ManageStudentsModal 
             isOpen={modalType === 'ManageStudents'} 
             onClose={() => setModalType(null)} 
-            batch={targetedBatch} 
+            batch={targetedBatch!} 
             title="Manage Students" 
           />
           <DeleteConfirmDialog 
             isOpen={modalType === 'Delete'} 
             onClose={() => setModalType(null)} 
-            batchName={targetedBatch.name} 
+            batchName={targetedBatch?.name} 
             title="Delete Batch" 
           />
           <BatchStatusModal 
             isOpen={modalType === 'Status'} 
             onClose={() => setModalType(null)} 
-            batchName={targetedBatch.name} 
-            type={statusType}
+            batchName={targetedBatch?.name} 
+            type={statusType!}
             title={statusType === 'Full' ? 'Mark as Full' : 'Mark as Inactive'}
           />
           <EditScheduleModal 
             isOpen={modalType === 'Schedule'} 
             onClose={() => setModalType(null)} 
-            batch={targetedBatch} 
+            batch={targetedBatch!} 
           />
         </>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-10 right-10 z-[200] flex items-center gap-3 bg-white border border-green-100 shadow-2xl p-5 rounded-3xl animate-in slide-in-from-bottom-5 duration-300">
+          <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-500">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Success</p>
+            <p className="text-sm font-black text-text-slate">{toast.message}</p>
+          </div>
+        </div>
       )}
     </div>
   );

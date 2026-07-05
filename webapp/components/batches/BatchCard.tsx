@@ -32,7 +32,7 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onView, onAction })
   return (
     <Card 
       className="border-none shadow-soft hover:shadow-soft-lg transition-all duration-300 overflow-hidden group rounded-[32px] bg-white ring-1 ring-gray-100/50"
-      style={{ borderLeft: `6px solid ${batch.color}` }}
+      style={{ borderLeft: `6px solid ${batch.color || '#5E4E99'}` }}
     >
       <CardContent className="p-8">
         <div className="flex justify-between items-start mb-6">
@@ -53,40 +53,42 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onView, onAction })
 
         <div className="flex flex-wrap gap-2 mb-8">
           <Badge variant="default" className="bg-brand-blue/10 text-brand-blue border-none font-bold text-[10px] uppercase tracking-wider">{batch.standard}</Badge>
-          {batch.subjects.map(s => (
+          {(batch.subjects || []).map(s => (
             <span key={s} className="px-3 py-1 rounded-lg bg-bg-soft text-[10px] font-bold text-gray-500 uppercase tracking-tight">{s}</span>
           ))}
         </div>
 
         <div className="flex items-center gap-4 py-5 border-y border-gray-50 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-bg-soft flex items-center justify-center font-black text-brand-blue shadow-sm">
-            {batch.teacher.name.charAt(0)}
+            {(batch.teacher?.name || 'U').charAt(0)}
           </div>
           <div>
-            <p className="text-sm font-bold text-text-slate leading-none mb-1.5">{batch.teacher.name}</p>
-            <a 
-              href={`tel:${batch.teacher.phone}`} 
-              className="flex items-center gap-1.5 text-xs text-gray-400 font-bold hover:text-brand-blue"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Phone className="w-3.5 h-3.5" />
-              {batch.teacher.phone}
-            </a>
+            <p className="text-sm font-bold text-text-slate leading-none mb-1.5">{batch.teacher?.name || 'Unassigned'}</p>
+            {batch.teacher?.phone && (
+              <a 
+                href={`tel:${batch.teacher.phone}`} 
+                className="flex items-center gap-1.5 text-xs text-gray-400 font-bold hover:text-brand-blue"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Phone className="w-3.5 h-3.5" />
+                {batch.teacher.phone}
+              </a>
+            )}
           </div>
         </div>
 
         <div className="space-y-4 mb-8">
           <div className="flex items-center gap-3 text-sm font-bold text-gray-400 group-hover:text-text-slate transition-colors">
             <Calendar className="w-4 h-4 text-brand-blue" />
-            <span>{batch.schedule.map(s => s.day.substring(0, 3)).join(' / ')}</span>
+            <span>{(batch.schedule || []).map(s => (s.day || '').substring(0, 3)).join(' / ')}</span>
           </div>
           <div className="flex items-center gap-3 text-sm font-bold text-gray-400 group-hover:text-text-slate transition-colors">
             <Clock className="w-4 h-4 text-brand-blue" />
-            <span>{batch.schedule[0].startTime} – {batch.schedule[0].endTime} AM</span>
+            <span>{batch.schedule?.[0]?.startTime || '10:00'} – {batch.schedule?.[0]?.endTime || '12:00'} AM</span>
           </div>
           <div className="flex items-center gap-3 text-sm font-bold text-gray-400 group-hover:text-text-slate transition-colors">
             <DoorOpen className="w-4 h-4 text-brand-blue" />
-            <span>{batch.room}</span>
+            <span>{batch.room || 'Room 101'}</span>
           </div>
         </div>
 
@@ -106,15 +108,15 @@ export const BatchCard: React.FC<BatchCardProps> = ({ batch, onView, onAction })
         <div className="grid grid-cols-3 gap-2 py-5 border-t border-gray-50 mb-8">
           <div className="text-center">
             <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Attendance</p>
-            <p className="font-bold text-sm text-green-500">{batch.averageAttendance}%</p>
+            <p className="font-bold text-sm text-green-500">{batch.averageAttendance || 0}%</p>
           </div>
           <div className="text-center border-x border-gray-50">
             <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Fees</p>
-            <p className="font-bold text-sm text-text-slate">₹{batch.fees.toLocaleString()}</p>
+            <p className="font-bold text-sm text-text-slate">₹{(batch.fees || 0).toLocaleString()}</p>
           </div>
           <div className="text-center">
             <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">Next Class</p>
-            <p className="font-bold text-sm text-brand-blue">{batch.schedule[0].day.substring(0, 3)}</p>
+            <p className="font-bold text-sm text-brand-blue">{batch.schedule?.[0]?.day ? batch.schedule[0].day.substring(0, 3) : '—'}</p>
           </div>
         </div>
 

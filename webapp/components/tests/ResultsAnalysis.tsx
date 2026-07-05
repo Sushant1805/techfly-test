@@ -1,31 +1,130 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
   LineChart, Line, XAxis as LXAxis, YAxis as LYAxis,
   CartesianGrid as LCartesianGrid, Tooltip as LTooltip
 } from 'recharts';
-import { 
-  Download, FileDown, TrendingUp, Users, 
+import {
+  Download, FileDown, TrendingUp, Users,
   Trophy, AlertCircle, ChevronDown, Search,
   Filter, Calendar, PieChart
 } from 'lucide-react';
-import { tests, studentMarks, gradeScale, subjectsMock } from '@/lib/mockData';
+
+const gradeScale = [
+  { grade: 'A+', minPercent: 90, maxPercent: 100, color: '#10b981' },
+  { grade: 'A', minPercent: 80, maxPercent: 89, color: '#22c55e' },
+  { grade: 'B+', minPercent: 70, maxPercent: 79, color: '#3b82f6' },
+  { grade: 'B', minPercent: 60, maxPercent: 69, color: '#8b5cf6' },
+  { grade: 'C', minPercent: 50, maxPercent: 59, color: '#f59e0b' },
+  { grade: 'D', minPercent: 40, maxPercent: 49, color: '#f97316' },
+  { grade: 'F', minPercent: 0, maxPercent: 39, color: '#ef4444' },
+];
 
 export const ResultsAnalysis: React.FC = () => {
-  const [selectedTestId, setSelectedTestId] = useState<string>('TST004'); // Default to a completed test
+  const [selectedTestId, setSelectedTestId] = useState<string>('');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [tests, setTests] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<any[]>([]);
 
-  const completedTests = useMemo(() => tests.filter(t => t.marksEntryDone), []);
-  const selectedTest = useMemo(() => tests.find(t => t.id === selectedTestId), [selectedTestId]);
-  
-  const testMarks = useMemo(() => {
-    return studentMarks.filter(m => m.testId === selectedTestId);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+
+        // Fetch tests
+        const testsRes = await fetch(`/api/${instituteSlug}/tests`);
+        const testsData = await testsRes.json();
+
+        if (testsData.success) {
+          const today = new Date().toISOString().split('T')[0];
+          const completedTests = testsData.tests
+            .filter((t: any) => t.date < today)
+            .map((t: any) => ({
+              ...t,
+              id: t._id,
+              totalMarks: t.maxMarks || 100,
+              passingMarks: t.passingMarks || 40,
+              scheduledDate: t.date,
+              marksEntryDone: false // Will be updated based on results
+            }));
+
+          setTests(completedTests);
+
+          // Select first completed test by default
+          if (completedTests.length > 0 && !selectedTestId) {
+            setSelectedTestId(completedTests[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTestId) return;
+
+    const fetchTestResults = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+
+        const resultsRes = await fetch(`/api/${instituteSlug}/test-results?testId=${selectedTestId}`);
+        const resultsData = await resultsRes.json();
+
+        if (resultsData.success) {
+          setTestResults(resultsData.results || []);
+        }
+      } catch (error) {
+        console.error('Error fetching test results:', error);
+      }
+    };
+
+    fetchTestResults();
   }, [selectedTestId]);
+
+  const completedTests = useMemo(() => tests, [tests]);
+  const selectedTest = useMemo(() => tests.find(t => t.id === selectedTestId), [selectedTestId, tests]);
+
+  const testMarks = useMemo(() => {
+    return testResults.map((r: any) => {
+      const percentage = r.marksObtained && selectedTest
+        ? Math.round((r.marksObtained / selectedTest.totalMarks) * 100)
+        : 0;
+      const grade = gradeScale.find(g => percentage >= g.minPercent && percentage <= g.maxPercent)?.grade || 'F';
+
+      return {
+        id: r._id,
+        studentId: r.studentId?._id || r.studentId,
+        studentName: r.studentId?.name || 'Unknown',
+        rollNumber: r.studentId?.rollNumber || 'N/A',
+        testId: r.testId,
+        marksObtained: r.marksObtained,
+        percentage,
+        grade,
+        isAbsent: r.isAbsent,
+        remarks: r.remarks,
+      };
+    });
+  }, [testResults, selectedTest]);
 
   const metrics = useMemo(() => {
     if (!selectedTest) return null;
@@ -33,16 +132,24 @@ export const ResultsAnalysis: React.FC = () => {
     const absent = testMarks.filter(m => m.isAbsent).length;
     const passCount = testMarks.filter(m => (m.marksObtained || 0) >= selectedTest.passingMarks && !m.isAbsent).length;
     const passPercent = appeared > 0 ? Math.round((passCount / appeared) * 100) : 0;
-    
+
+    const validMarks = testMarks.filter(m => !m.isAbsent && m.marksObtained !== null);
+    const marksObtained = validMarks.map(m => m.marksObtained);
+    const avg = marksObtained.length > 0
+      ? Math.round(marksObtained.reduce((a, b) => a + b, 0) / marksObtained.length)
+      : 0;
+    const high = marksObtained.length > 0 ? Math.max(...marksObtained) : 0;
+    const low = marksObtained.length > 0 ? Math.min(...marksObtained) : 0;
+
     return {
       total: testMarks.length,
       appeared,
       absent,
       passCount,
       passPercent,
-      avg: selectedTest.averageScore,
-      high: selectedTest.highestScore,
-      low: selectedTest.lowestScore
+      avg,
+      high,
+      low
     };
   }, [selectedTest, testMarks]);
 
@@ -68,12 +175,18 @@ export const ResultsAnalysis: React.FC = () => {
   }, [selectedTest, testMarks]);
 
   const topPerformers = useMemo(() => {
-    return [...testMarks].filter(m => !m.isAbsent).sort((a, b) => (b.marksObtained || 0) - (a.marksObtained || 0)).slice(0, 3);
+    return [...testMarks]
+      .filter(m => !m.isAbsent)
+      .sort((a, b) => (b.marksObtained || 0) - (a.marksObtained || 0))
+      .slice(0, 3)
+      .map((m, idx) => ({ ...m, rank: idx + 1 }));
   }, [testMarks]);
 
   const needsAttention = useMemo(() => {
     if (!selectedTest) return [];
-    return testMarks.filter(m => !m.isAbsent && (m.marksObtained || 0) < selectedTest.passingMarks).slice(0, 3);
+    return testMarks
+      .filter(m => !m.isAbsent && (m.marksObtained || 0) < selectedTest.passingMarks)
+      .slice(0, 3);
   }, [selectedTest, testMarks]);
 
   return (
@@ -84,11 +197,15 @@ export const ResultsAnalysis: React.FC = () => {
           <div className="relative flex-1 min-w-[300px]">
             <p className="text-[9px] font-black text-brand-blue uppercase tracking-widest ml-4 mb-1">Analyze results for</p>
             <div className="relative">
-               <select 
+               <select
                  className="w-full h-12 rounded-2xl bg-bg-soft/20 border border-gray-100 pl-6 pr-10 text-sm font-black text-text-slate appearance-none focus:outline-none transition-all"
                  value={selectedTestId}
                  onChange={(e) => setSelectedTestId(e.target.value)}
+                 disabled={loading || completedTests.length === 0}
                >
+                 <option value="" disabled>
+                   {loading ? 'Loading tests...' : completedTests.length === 0 ? 'No completed tests available' : 'Select a test...'}
+                 </option>
                  {completedTests.map(t => (
                    <option key={t.id} value={t.id}>{t.title} \u2014 {t.batchName} ({t.scheduledDate})</option>
                  ))}
@@ -109,15 +226,30 @@ export const ResultsAnalysis: React.FC = () => {
         </div>
       </div>
 
-      {selectedTest && metrics && (
+      {loading ? (
+        <Card className="p-12 border-none shadow-soft rounded-[32px] bg-white text-center">
+          <p className="font-black text-gray-400">Loading test data...</p>
+        </Card>
+      ) : !selectedTest ? (
+        <Card className="p-12 border-none shadow-soft rounded-[32px] bg-white text-center">
+          <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="font-black text-gray-400">Select a completed test to view analysis</p>
+        </Card>
+      ) : testMarks.length === 0 ? (
+        <Card className="p-12 border-none shadow-soft rounded-[32px] bg-white text-center">
+          <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="font-black text-gray-400">No marks data available for this test</p>
+          <p className="text-sm font-bold text-gray-300 mt-2">Enter marks first to view analysis</p>
+        </Card>
+      ) : (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           {/* 2. Metric Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            <StatCard label="Appeared" value={metrics.appeared} icon={Users} color="text-brand-blue" sub={`of ${metrics.total}`} />
-            <StatCard label="Absent" value={metrics.absent} icon={AlertCircle} color="text-red-400" sub="Need justification" />
-            <StatCard label="Avg Score" value={Math.round((metrics.avg || 0) / (selectedTest.totalMarks || 1) * 100) + '%'} icon={TrendingUp} color="text-text-slate" sub={`${metrics.avg}/${selectedTest.totalMarks}`} />
-            <StatCard label="Highest" value={metrics.high || 0} icon={Trophy} color="text-green-500" sub="Top Performer" />
-            <StatCard label="Pass %" value={metrics.passPercent + '%'} icon={PieChart} color={metrics.passPercent > 70 ? 'text-green-500' : 'text-amber-500'} sub={`${metrics.passCount} Passed`} />
+            <StatCard label="Appeared" value={metrics!.appeared} icon={Users} color="text-brand-blue" sub={`of ${metrics!.total}`} />
+            <StatCard label="Absent" value={metrics!.absent} icon={AlertCircle} color="text-red-400" sub="Need justification" />
+            <StatCard label="Avg Score" value={Math.round((metrics!.avg || 0) / (selectedTest.totalMarks || 1) * 100) + '%'} icon={TrendingUp} color="text-text-slate" sub={`${metrics!.avg}/${selectedTest.totalMarks}`} />
+            <StatCard label="Highest" value={metrics!.high || 0} icon={Trophy} color="text-green-500" sub="Top Performer" />
+            <StatCard label="Pass %" value={metrics!.passPercent + '%'} icon={PieChart} color={metrics!.passPercent > 70 ? 'text-green-500' : 'text-amber-500'} sub={`${metrics!.passCount} Passed`} />
             <StatCard label="Passing Mark" value={selectedTest.passingMarks} icon={AlertCircle} color="text-orange-400" sub={`of ${selectedTest.totalMarks}`} />
           </div>
 

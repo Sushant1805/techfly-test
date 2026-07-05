@@ -8,23 +8,74 @@ import {
   User, CheckSquare, Trash2, Zap,
   Save, AlertCircle
 } from 'lucide-react';
-import { tests, students, Test, gradeScale } from '@/lib/mockData';
+import { gradeScale } from '@/lib/mockData';
 
 export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTestId: initialTestId }) => {
+  const [tests, setTests] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(initialTestId || null);
   const [searchTerm, setSearchTerm] = useState('');
   const [marks, setMarks] = useState<Record<string, { marks: string; isAbsent: boolean; remarks: string }>>({});
   const [isSaved, setIsSaved] = useState(false);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+
+        const [testsRes, studentsRes] = await Promise.all([
+          fetch(`/api/${instituteSlug}/tests`),
+          fetch(`/api/${instituteSlug}/students`)
+        ]);
+
+        const testsData = await testsRes.json();
+        const studentsData = await studentsRes.json();
+
+        if (testsData.success) {
+          const today = new Date().toISOString().split('T')[0];
+          const completedTests = testsData.tests.filter((t: any) => {
+            const testDate = t.date;
+            const isCompleted = testDate < today;
+            return isCompleted;
+          }).map((t: any) => ({
+            ...t,
+            id: t._id,
+            totalMarks: t.maxMarks || 100,
+            scheduledDate: t.date
+          }));
+          setTests(completedTests);
+        }
+        if (studentsData.success) {
+          const mappedStudents = studentsData.students.map((s: any) => ({
+            ...s,
+            id: s._id
+          }));
+          setStudents(mappedStudents);
+        }
+      } catch (error) {
+        console.error('Error fetching marks data:', error);
+      }
+    };
+    fetchData();
+  }, []);
+
   // Available tests for marks entry
-  const marksPendingTests = useMemo(() => tests.filter(t => t.status === 'Completed'), []);
-  const selectedTest = useMemo(() => tests.find(t => t.id === selectedTestId), [selectedTestId]);
+  const marksPendingTests = useMemo(() => tests, [tests]);
+  const selectedTest = useMemo(() => tests.find(t => t.id === selectedTestId), [selectedTestId, tests]);
   
   // Batch students
   const batchStudents = useMemo(() => {
     if (!selectedTest) return [];
-    return students.filter(s => s.batch === selectedTest.batchName);
-  }, [selectedTest]);
+    return students.filter(s => {
+      const studentBatchId = typeof s.batchId === 'object' ? s.batchId._id : s.batchId;
+      const testBatchId = typeof selectedTest.batchId === 'object' ? selectedTest.batchId._id : selectedTest.batchId;
+      return studentBatchId === testBatchId;
+    });
+  }, [selectedTest, students]);
+
 
   // Derived Marks Analysis
   const analysis = useMemo(() => {
@@ -80,7 +131,7 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
     const filled: any = {};
     batchStudents.forEach(s => {
       const isAbs = Math.random() < 0.05;
-      filled[s.id] = {
+      filled[s._id] = {
         marks: isAbs ? '' : String(Math.floor(Math.random() * (selectedTest.totalMarks - 10) + 10)),
         isAbsent: isAbs,
         remarks: ''
@@ -89,9 +140,44 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
     setMarks(filled);
   };
 
-  const handleSave = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+  const handleSave = async () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+
+      // Prepare marks data for saving
+      const marksData = Object.entries(marks).map(([studentId, markData]) => ({
+        testId: selectedTestId,
+        studentId,
+        marksObtained: markData.isAbsent ? 0 : Number(markData.marks),
+        isAbsent: markData.isAbsent,
+        remarks: markData.remarks,
+        instituteId: instituteSlug
+      }));
+
+      // Save marks to TestResult collection
+      const res = await fetch(`/api/${instituteSlug}/test-results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ marks: marksData }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 3000);
+      } else {
+        alert('Failed to save marks: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error saving marks:', error);
+      alert('Error saving marks');
+    }
   };
 
   // Keyboard Navigation: Tab/Enter focus next row
@@ -206,7 +292,7 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
                         <td>
                           <div className="flex items-center gap-2">
                             <div className="relative">
-                              <input 
+                              <input
                                 type="number"
                                 ref={el => { inputRefs.current[student.id] = el; }}
                                 value={studentMark.marks}
@@ -221,8 +307,8 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
                                   }
                                 }}
                                 className={`w-20 h-12 rounded-xl text-center font-black text-lg focus:outline-none focus:ring-4 transition-all duration-300 ${
-                                  studentMark.isAbsent 
-                                  ? 'bg-gray-50 text-gray-300 border-none' 
+                                  studentMark.isAbsent
+                                  ? 'bg-gray-50 text-gray-300 border-none'
                                   : 'bg-white border-2 border-gray-100 text-text-slate focus:border-brand-blue focus:ring-brand-blue/10'
                                 }`}
                               />
@@ -248,11 +334,11 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
                           {studentMark.isAbsent && <Badge className="bg-red-500 text-white border-none text-[9px] font-black uppercase tracking-widest px-3">Absent</Badge>}
                         </td>
                         <td className="text-center">
-                          <button 
+                          <button
                             onClick={() => toggleAbsent(student.id)}
                             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                              studentMark.isAbsent 
-                              ? 'bg-red-500 text-white shadow-lg shadow-red-200 scale-105' 
+                              studentMark.isAbsent
+                              ? 'bg-red-500 text-white shadow-lg shadow-red-200 scale-105'
                               : 'bg-gray-50 text-gray-300 hover:bg-red-50 hover:text-red-400'
                             }`}
                           >
@@ -260,7 +346,7 @@ export const EnterMarks: React.FC<{ selectedTestId?: string }> = ({ selectedTest
                           </button>
                         </td>
                         <td className="pr-10">
-                          <input 
+                          <input
                             placeholder="Add remarks..."
                             className="w-full h-10 bg-transparent border-none text-xs font-bold text-gray-400 focus:text-text-slate focus:outline-none transition-colors"
                             value={studentMark.remarks}

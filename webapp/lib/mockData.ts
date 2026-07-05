@@ -21,6 +21,7 @@ export interface Student {
   dob: string;
   standard: string;
   batch: string;
+  batchId?: string;
   rollNumber: string;
   phone: string;
   parentName: string;
@@ -1126,6 +1127,7 @@ export interface Batch {
   standard: string;
   subjects: string[];
   teacher: Teacher;
+  teacherId?: string;
   capacity: number;
   totalStudents: number;
   schedule: Schedule[];

@@ -8,24 +8,64 @@ import {
   Search, MessageSquare, ChevronRight, ChevronLeft,
   AlertTriangle, Filter, Save, Trash2, Edit2
 } from 'lucide-react';
-import { students, batches, Batch, AttendanceStatus, AttendanceRecord } from '@/lib/mockData';
+import { AttendanceStatus, AttendanceRecord } from '@/lib/mockData';
 
 export const MarkAttendance: React.FC = () => {
-  const [selectedBatchId, setSelectedBatchId] = useState<string>(batches[0].id);
+  const [batches, setBatches] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditing, setIsEditing] = useState(true);
   
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+
+        const [batchesRes, studentsRes] = await Promise.all([
+          fetch(`/api/${instituteSlug}/batches`),
+          fetch(`/api/${instituteSlug}/students`)
+        ]);
+        
+        const batchesData = await batchesRes.json();
+        const studentsData = await studentsRes.json();
+        
+        if (batchesData.success) {
+          setBatches(batchesData.batches);
+          if (batchesData.batches.length > 0) setSelectedBatchId(batchesData.batches[0]._id);
+        }
+        if (studentsData.success) {
+          const mapped = studentsData.students.map((s: any) => ({
+            id: s._id,
+            name: s.name,
+            rollNumber: s.rollNumber || 'N/A',
+            batchId: s.batchId?._id || ''
+          }));
+          setStudents(mapped);
+        }
+      } catch (error) {
+        console.error('Error fetching attendance data:', error);
+      }
+    };
+    fetchData();
+  }, []);
+
   // Local state for current attendance session
   const [currentAttendance, setCurrentAttendance] = useState<Record<string, { status: AttendanceStatus; note?: string; time?: string }>>({});
   
-  const selectedBatch = useMemo(() => batches.find(b => b.id === selectedBatchId), [selectedBatchId]);
+  const selectedBatch = useMemo(() => batches.find(b => b._id === selectedBatchId), [selectedBatchId, batches]);
   
   const batchStudents = useMemo(() => {
-    return students.filter(s => s.batch === selectedBatch?.name)
+    return students.filter(s => s.batchId === selectedBatchId)
       .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [selectedBatch, searchTerm]);
+  }, [selectedBatchId, searchTerm, students]);
+
+
 
   const stats = useMemo(() => {
     const values = Object.values(currentAttendance);
@@ -39,16 +79,45 @@ export const MarkAttendance: React.FC = () => {
     };
   }, [currentAttendance, batchStudents]);
 
-  const handleLoad = () => {
-    setIsLoaded(true);
-    setIsEditing(true);
-    // Initialize with Unmarked
-    const init: Record<string, { status: AttendanceStatus }> = {};
-    batchStudents.forEach(s => {
-      init[s.id] = { status: 'Unmarked' };
-    });
-    setCurrentAttendance(init);
+  const handleLoad = async () => {
+    try {
+      setIsLoaded(true);
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+
+      // Check if attendance already exists for this batch and date
+      const res = await fetch(`/api/${instituteSlug}/attendance?batchId=${selectedBatchId}&date=${selectedDate}`);
+      const data = await res.json();
+
+      const init: Record<string, { status: AttendanceStatus }> = {};
+      
+      if (data.success && data.attendance.length > 0) {
+        // Attendance exists
+        const existing = data.attendance[0]; // Assuming one record per day/batch
+        existing.records.forEach((r: any) => {
+          init[r.studentId] = { status: r.status };
+        });
+        // Fill in students who might be in the batch but not in the saved record
+        batchStudents.forEach(s => {
+          if (!init[s.id]) init[s.id] = { status: 'Unmarked' };
+        });
+        setCurrentAttendance(init);
+        setIsEditing(false); // View only if already saved
+      } else {
+        // Fresh attendance
+        batchStudents.forEach(s => {
+          init[s.id] = { status: 'Unmarked' };
+        });
+        setCurrentAttendance(init);
+        setIsEditing(true);
+      }
+    } catch (error) {
+      console.error('Error loading attendance:', error);
+    }
   };
+
 
   const updateStatus = (studentId: string, status: AttendanceStatus) => {
     if (!isEditing) return;
@@ -69,9 +138,7 @@ export const MarkAttendance: React.FC = () => {
     setCurrentAttendance(prev => {
       const next = { ...prev };
       batchStudents.forEach(s => {
-        if (next[s.id]?.status === 'Unmarked') {
-          next[s.id] = { ...next[s.id], status };
-        }
+        next[s.id] = { ...next[s.id], status };
       });
       return next;
     });
@@ -88,7 +155,51 @@ export const MarkAttendance: React.FC = () => {
     });
   };
 
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+
+      const markedRecords = Object.entries(currentAttendance)
+        .filter(([_, data]) => data.status !== 'Unmarked')
+        .map(([studentId, data]) => ({
+          studentId,
+          status: data.status
+        }));
+
+      const res = await fetch(`/api/${instituteSlug}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batchId: selectedBatchId,
+          date: selectedDate,
+          records: markedRecords
+        })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert('Attendance Saved Successfully!');
+        setIsEditing(false);
+      } else {
+        alert('Error: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error saving attendance:', error);
+      alert('An error occurred while saving attendance.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
+
     <div className="space-y-6 pb-24">
       {/* Step 1: Selection Bar */}
       <Card className="p-6 border-none shadow-soft rounded-[28px] bg-white">
@@ -104,7 +215,9 @@ export const MarkAttendance: React.FC = () => {
               }}
             >
               {batches.map(b => (
-                <option key={b.id} value={b.id}>{b.name} — {b.standard} ({b.schedule.map(s => s.day.substring(0,3)).join('/')})</option>
+                <option key={b._id} value={b._id}>
+                  {b.name} — {b.standard} {b.schedule && Array.isArray(b.schedule) ? `(${b.schedule.map((s: any) => s.day.substring(0,3)).join('/')})` : ''}
+                </option>
               ))}
             </select>
           </div>
@@ -161,19 +274,31 @@ export const MarkAttendance: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex-1 max-w-[200px] space-y-2">
-              <div className="flex justify-between items-end">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stats.total - stats.unmarked} / {stats.total} Marked</span>
-                <span className="text-[10px] font-black text-brand-blue">{Math.round(((stats.total - stats.unmarked) / stats.total) * 100)}%</span>
-              </div>
-              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-brand-blue transition-all duration-500" 
-                  style={{ width: `${((stats.total - stats.unmarked) / stats.total) * 100}%` }}
-                />
+            <div className="flex items-center gap-3">
+              {!isEditing && (
+                <Button 
+                  onClick={() => setIsEditing(true)}
+                  variant="outline"
+                  className="h-11 px-6 rounded-xl border-brand-blue text-brand-blue font-black uppercase tracking-widest text-[10px] gap-2 hover:bg-brand-blue hover:text-white transition-all"
+                >
+                  <Edit2 className="w-3.5 h-3.5" /> Edit Attendance
+                </Button>
+              )}
+              <div className="flex-1 max-w-[200px] space-y-2 min-w-[150px]">
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stats.total - stats.unmarked} / {stats.total} Marked</span>
+                  <span className="text-[10px] font-black text-brand-blue">{Math.round(((stats.total - stats.unmarked) / stats.total) * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-brand-blue transition-all duration-500" 
+                    style={{ width: `${((stats.total - stats.unmarked) / stats.total) * 100}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
+
 
           {/* Step 3: Bulk Action Row */}
           <div className="flex flex-wrap items-center justify-between gap-4 px-2">
@@ -227,13 +352,10 @@ export const MarkAttendance: React.FC = () => {
             </div>
             <Button 
               className="h-14 px-12 rounded-2xl shadow-brand-blue/20 bg-brand-blue hover:bg-brand-blue/90 text-white font-black uppercase tracking-widest text-xs"
-              onClick={() => {
-                alert('Attendance Saved Successfully!');
-                setIsEditing(false);
-              }}
-              disabled={stats.total - stats.unmarked === 0}
+              onClick={handleSave}
+              disabled={stats.total - stats.unmarked === 0 || isSaving}
             >
-              <Save className="w-4 h-4 mr-2" /> Save Attendance
+              {isSaving ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Attendance</>}
             </Button>
           </div>
         </div>
@@ -241,6 +363,7 @@ export const MarkAttendance: React.FC = () => {
     </div>
   );
 };
+
 
 interface RowProps {
   student: any;

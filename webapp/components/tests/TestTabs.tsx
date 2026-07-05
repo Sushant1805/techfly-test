@@ -1,10 +1,10 @@
 'use client';
 import React from 'react';
-import { LayoutGrid, Edit3, PieChart, Settings } from 'lucide-react';
+import { LayoutGrid, Edit3, PieChart, Settings, Brain, Share2 } from 'lucide-react';
 
 interface TestTabsProps {
-  activeTab: 'All' | 'Enter' | 'Results' | 'Settings';
-  onTabChange: (tab: 'All' | 'Enter' | 'Results' | 'Settings') => void;
+  activeTab: 'All' | 'Enter' | 'Results' | 'Analytics' | 'AI' | 'Share' | 'Settings';
+  onTabChange: (tab: 'All' | 'Enter' | 'Results' | 'Analytics' | 'AI' | 'Share' | 'Settings') => void;
 }
 
 export const TestTabs: React.FC<TestTabsProps> = ({ activeTab, onTabChange }) => {
@@ -12,6 +12,9 @@ export const TestTabs: React.FC<TestTabsProps> = ({ activeTab, onTabChange }) =>
     { id: 'All', label: 'All Tests', icon: LayoutGrid },
     { id: 'Enter', label: 'Enter Marks', icon: Edit3 },
     { id: 'Results', label: 'Results & Analysis', icon: PieChart },
+    { id: 'Analytics', label: 'Test Analytics', icon: PieChart },
+    { id: 'AI', label: 'AI Insights', icon: Brain },
+    { id: 'Share', label: 'Share to Parents', icon: Share2 },
     { id: 'Settings', label: 'Test Settings', icon: Settings },
   ] as const;
 

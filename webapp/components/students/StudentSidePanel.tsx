@@ -10,9 +10,12 @@ interface StudentSidePanelProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit: (student: Student) => void;
+  userRole?: string;
+  hideFinancials?: boolean;
 }
 
-export const StudentSidePanel: React.FC<StudentSidePanelProps> = ({ student, isOpen, onClose, onEdit }) => {
+export const StudentSidePanel: React.FC<StudentSidePanelProps> = ({ student, isOpen, onClose, onEdit, userRole = 'teacher', hideFinancials = false }) => {
+
   const [activeTab, setActiveTab] = useState<'Overview' | 'Attendance' | 'Fees' | 'Tests' | 'Notes'>('Overview');
 
   if (!student) return null;
@@ -68,18 +71,27 @@ export const StudentSidePanel: React.FC<StudentSidePanelProps> = ({ student, isO
             </div>
           </div>
           
-          <Button 
-            variant="ghost" 
-            className="absolute bottom-8 right-10 gap-2 h-11 px-5 rounded-2xl bg-white hover:bg-brand-blue hover:text-white shadow-soft transition-all"
-            onClick={() => onEdit(student)}
-          >
-            <Edit className="w-4 h-4" /> Edit Profile
-          </Button>
+          {(userRole === 'owner' || userRole === 'manager') && (
+            <Button 
+              variant="ghost" 
+              className="absolute bottom-8 right-10 gap-2 h-11 px-5 rounded-2xl bg-white hover:bg-brand-blue hover:text-white shadow-soft transition-all"
+              onClick={() => onEdit(student)}
+            >
+              <Edit className="w-4 h-4" /> Edit Profile
+            </Button>
+          )}
         </div>
 
         {/* Tab Navigation */}
         <div className="px-6 py-2 border-b border-gray-50 flex items-center gap-2 bg-white sticky top-0">
-          {tabs.map(tab => (
+          {tabs
+            .filter(tab => {
+              if (userRole === 'teacher') return tab.id !== 'Fees';
+              if (userRole === 'reception') return ['Overview', 'Fees'].includes(tab.id);
+              return true;
+            })
+            .map(tab => (
+
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
@@ -188,12 +200,13 @@ const AttendanceTab = ({ studentId, overall }: { studentId: string; overall: num
 const FeesTab = ({ student }: { student: Student }) => {
   const history = paymentHistory.filter(p => p.studentId === student.id);
   const isPending = student.feesStatus !== 'Paid';
+  const totalFeesDue = student.totalFeesDue ?? 0;
   return (
     <div className="space-y-10">
       <div className="grid grid-cols-3 gap-4">
         <StatCard label="Total Annual" value="₹48,000" color="text-text-slate" />
-        <StatCard label="Total Paid" value={`₹${48000 - student.totalFeesDue}`} color="text-green-500" />
-        <StatCard label="Balance Due" value={`₹${student.totalFeesDue}`} color={isPending ? "text-red-500" : "text-green-500"} />
+        <StatCard label="Total Paid" value={`₹${(48000 - totalFeesDue).toLocaleString()}`} color="text-green-500" />
+        <StatCard label="Balance Due" value={`₹${totalFeesDue.toLocaleString()}`} color={isPending ? "text-red-500" : "text-green-500"} />
       </div>
 
       {isPending && (
@@ -201,7 +214,7 @@ const FeesTab = ({ student }: { student: Student }) => {
           <div className="flex items-center gap-4">
             <AlertCircle className="text-red-500 w-8 h-8" />
             <div>
-              <p className="font-bold text-red-500">₹{student.totalFeesDue} Pending</p>
+              <p className="font-bold text-red-500">₹{totalFeesDue.toLocaleString()} Pending</p>
               <p className="text-xs text-red-400 font-medium">Due since 1 Apr 2026</p>
             </div>
           </div>

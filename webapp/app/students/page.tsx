@@ -1,10 +1,11 @@
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Search, Plus, Filter, Download } from 'lucide-react';
-import { students, Student } from '@/lib/mockData';
+import { Student } from '@/lib/mockData';
 import { SummaryStrip } from '@/components/students/SummaryStrip';
 import { StudentTable } from '@/components/students/StudentTable';
 import { StudentSidePanel } from '@/components/students/StudentSidePanel';
@@ -15,9 +16,13 @@ import {
   ChangeBatchModal, 
   DeleteConfirmDialog 
 } from '@/components/students/StudentModals';
+import { setupAuthOptions } from '@/lib/api';
 
 export default function Students() {
+  const router = useRouter();
   // --- State ---
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     standard: 'All Standards',
@@ -32,6 +37,65 @@ export default function Students() {
   // Modal states
   const [modalType, setModalType] = useState<'Add' | 'Edit' | 'Payment' | 'Batch' | 'Delete' | null>(null);
   const [targetedStudent, setTargetedStudent] = useState<Student | null>(null);
+
+  const [userRole, setUserRole] = useState('teacher');
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          // not logged in or stale user — redirect to login to refresh stored institute
+          router.push('/login');
+          return;
+        }
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+        if (!instituteSlug) {
+          router.push('/login');
+          return;
+        }
+        setUserRole(user.role);
+
+        const res = await fetch(`/api/${instituteSlug}/students`);
+        const data = await res.json();
+        if (data.success) {
+          const mapped = data.students.map((s: any) => ({
+            id: s._id,
+            name: s.name,
+            rollNumber: s.rollNumber,
+            standard: s.standard,
+            batch: s.batchId ? (typeof s.batchId === 'object' ? s.batchId.name : 'Unassigned') : 'Unassigned',
+            batchId: s.batchId ? (typeof s.batchId === 'object' ? s.batchId._id : s.batchId) : '',
+            phone: s.phone,
+            email: s.email,
+            parentName: s.parentName,
+            parentPhone: s.parentPhone,
+            address: s.address,
+            status: s.status, 
+            feesStatus: s.feesStatus, 
+            attendancePercent: s.attendancePercent, 
+            joinDate: s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '',
+            lastPaymentDate: s.lastPaymentDate,
+            totalFeesDue: s.totalFeesDue,
+            photo: s.photo,
+            gender: s.gender,
+            dob: s.dob,
+            parentRelation: s.parentRelation,
+            subjects: s.subjects,
+            lastTestScore: s.lastTestScore,
+            notes: s.notes
+          }));
+          setStudents(mapped);
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStudents();
+  }, [modalType]);
 
   // --- Derived Data ---
   const filteredStudents = useMemo(() => {
@@ -49,14 +113,14 @@ export default function Students() {
 
       return matchesSearch && matchesStandard && matchesBatch && matchesStatus && matchesFees;
     });
-  }, [searchTerm, filters]);
+  }, [searchTerm, filters, students]);
 
   const summaryData = useMemo(() => ({
     total: filteredStudents.length,
     active: filteredStudents.filter(s => s.status === 'Active').length,
-    pendingFees: filteredStudents.filter(s => s.feesStatus !== 'Paid').length,
+    pendingFees: userRole.toLowerCase() === 'teacher' ? 0 : filteredStudents.filter(s => s.feesStatus !== 'Paid').length,
     lowAttendance: filteredStudents.filter(s => s.attendancePercent < 75).length,
-  }), [filteredStudents]);
+  }), [filteredStudents, userRole]);
 
   // --- Handlers ---
   const handleSelectAll = (checked: boolean) => {
@@ -73,13 +137,16 @@ export default function Students() {
   };
 
   const handleOpenModal = (type: 'Add' | 'Edit' | 'Payment' | 'Batch' | 'Delete', student?: Student) => {
+    if (userRole.toLowerCase() === 'teacher' && (type === 'Add' || type === 'Edit' || type === 'Delete' || type === 'Payment' || type === 'Batch')) {
+      return; // Teachers cannot perform these actions
+    }
     setTargetedStudent(student || null);
     setModalType(type);
   };
 
   const handleBulkAction = (action: string) => {
+    if (userRole.toLowerCase() === 'teacher') return;
     console.log(`Bulk action: ${action} on ${selectedIds.length} students`);
-    // Placeholder for actual logic
     if (action === 'Clear') setSelectedIds([]);
   };
 
@@ -92,7 +159,9 @@ export default function Students() {
           <div className="flex flex-col xl:flex-row gap-8 justify-between items-start xl:items-center">
             <div>
               <h1 className="text-4xl font-black text-text-slate tracking-tight leading-none mb-3">Students</h1>
-              <p className="text-sm font-bold text-gray-400">Management & Tracking Dashboard</p>
+              <p className="text-sm font-bold text-gray-400">
+                {userRole.toLowerCase() === 'teacher' ? 'Your Student Rosters' : 'Management & Tracking Dashboard'}
+              </p>
             </div>
             
             <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
@@ -105,9 +174,17 @@ export default function Students() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button onClick={() => handleOpenModal('Add')} className="h-14 px-8 rounded-2xl gap-2 font-black text-sm uppercase tracking-widest shadow-brand-blue/20">
-                <Plus className="w-5 h-5" /> Add Student
-              </Button>
+              <div className="flex items-center gap-4">
+                {['owner', 'manager', 'reception'].includes(userRole.toLowerCase()) && (
+                  <Button 
+                    onClick={() => handleOpenModal('Add')}
+                    className="h-14 px-8 rounded-2xl bg-brand-blue border-none shadow-xl shadow-brand-blue/30 font-black text-xs uppercase tracking-widest gap-4 group"
+                  >
+                    <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
+                    Add Student
+                  </Button>
+                )}
+              </div>
               <Button variant="outline" className="h-14 px-6 rounded-2xl gap-2 font-black text-sm uppercase tracking-widest border-gray-100 shadow-soft">
                 <Download className="w-5 h-5" /> Export
               </Button>
@@ -131,11 +208,13 @@ export default function Students() {
               options={['All', 'Active', 'Inactive', 'On Leave']} 
               onChange={(val) => setFilters(f => ({ ...f, status: val }))}
             />
-            <FilterSelect 
-              value={filters.fees} 
-              options={['All', 'Paid', 'Pending', 'Partial']} 
-              onChange={(val) => setFilters(f => ({ ...f, fees: val }))}
-            />
+            {userRole.toLowerCase() !== 'teacher' && (
+              <FilterSelect 
+                value={filters.fees} 
+                options={['All', 'Paid', 'Pending', 'Partial']} 
+                onChange={(val) => setFilters(f => ({ ...f, fees: val }))}
+              />
+            )}
             {(filters.standard !== 'All Standards' || filters.batch !== 'All Batches' || filters.status !== 'All' || filters.fees !== 'All') && (
               <button 
                 onClick={() => setFilters({ standard: 'All Standards', batch: 'All Batches', status: 'All', fees: 'All' })}
@@ -150,13 +229,13 @@ export default function Students() {
 
           {/* Table Container */}
           <Card className="border-none shadow-soft-lg rounded-[40px] overflow-hidden bg-white/50 backdrop-blur-sm">
-            <StudentTable 
+              <StudentTable 
               students={filteredStudents}
               selectedIds={selectedIds}
               onSelectAll={handleSelectAll}
               onSelectRow={handleSelectRow}
               onView={handleOpenSidePanel}
-              onEdit={(s) => handleOpenModal('Edit', s)}
+              onEdit={userRole.toLowerCase() === 'teacher' ? (_s: Student) => {} : (s) => handleOpenModal('Edit', s)}
               onAction={(s, action) => {
                 if (action === 'More') handleOpenSidePanel(s);
               }}
@@ -179,48 +258,58 @@ export default function Students() {
         student={activeStudent} 
         isOpen={isSidePanelOpen} 
         onClose={() => setIsSidePanelOpen(false)}
-        onEdit={(s) => handleOpenModal('Edit', s)}
+        onEdit={userRole.toLowerCase() === 'teacher' ? (_s: Student) => {} : (s) => handleOpenModal('Edit', s)}
+        userRole={userRole}
+        hideFinancials={userRole.toLowerCase() === 'teacher'}
       />
+
 
       {/* Floating Bulk Actions */}
-      <BulkActionsBar 
-        selectedCount={selectedIds.length} 
-        onClear={() => setSelectedIds([])}
-        onAction={handleBulkAction}
-      />
+      {userRole.toLowerCase() !== 'teacher' && (
+        <BulkActionsBar 
+          selectedCount={selectedIds.length} 
+          onClear={() => setSelectedIds([])}
+          onAction={handleBulkAction}
+        />
+      )}
 
       {/* Modals Layer */}
-      <AddEditStudentModal 
-        isOpen={modalType === 'Add' || modalType === 'Edit'} 
-        onClose={() => setModalType(null)}
-        title={modalType === 'Add' ? 'Add New Student' : `Edit Student — ${targetedStudent?.name}`}
-        student={targetedStudent}
-      />
-      {targetedStudent && (
+      {userRole.toLowerCase() !== 'teacher' && (
         <>
-          <RecordPaymentModal 
-            isOpen={modalType === 'Payment'} 
-            onClose={() => setModalType(null)} 
-            student={targetedStudent} 
-            title="Record Payment" 
+          <AddEditStudentModal 
+            isOpen={modalType === 'Add' || modalType === 'Edit'} 
+            onClose={() => setModalType(null)}
+            title={modalType === 'Add' ? 'Add New Student' : `Edit Student — ${targetedStudent?.name}`}
+            student={targetedStudent}
           />
-          <ChangeBatchModal 
-            isOpen={modalType === 'Batch'} 
-            onClose={() => setModalType(null)} 
-            student={targetedStudent} 
-            title="Change Batch" 
-          />
-          <DeleteConfirmDialog 
-            isOpen={modalType === 'Delete'} 
-            onClose={() => setModalType(null)} 
-            studentName={targetedStudent.name} 
-            title="Delete Student" 
-          />
+          {targetedStudent && (
+            <>
+              <RecordPaymentModal 
+                isOpen={modalType === 'Payment'} 
+                onClose={() => setModalType(null)} 
+                student={targetedStudent} 
+                title="Record Payment" 
+              />
+              <ChangeBatchModal 
+                isOpen={modalType === 'Batch'} 
+                onClose={() => setModalType(null)} 
+                student={targetedStudent} 
+                title="Change Batch" 
+              />
+              <DeleteConfirmDialog 
+                isOpen={modalType === 'Delete'} 
+                onClose={() => setModalType(null)} 
+                studentName={targetedStudent.name} 
+                title="Delete Student" 
+              />
+            </>
+          )}
         </>
       )}
     </div>
   );
 }
+
 
 // --- Local Components ---
 

@@ -99,37 +99,40 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <div className="space-y-1">
-                    <p className="font-bold text-text-slate text-sm leading-none">{student.parentName}</p>
                     <a 
-                      href={`tel:${student.parentPhone}`} 
+                      href={`tel:${student.phone}`} 
                       className="flex items-center gap-1.5 text-[11px] font-bold text-brand-blue hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Phone className="w-3 h-3" />
-                      {student.parentPhone}
+                      {student.phone}
                     </a>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="w-24">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className={`text-[13px] font-black ${getAttendanceColor(student.attendancePercent)}`}>
-                        {student.attendancePercent}%
-                      </span>
+                  {student.attendancePercent && student.attendancePercent > 0 ? (
+                    <div className="w-24">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className={`text-[13px] font-black ${getAttendanceColor(student.attendancePercent)}`}>
+                          {student.attendancePercent}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-bg-soft rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${getAttendanceColor(student.attendancePercent).replace('text', 'bg')} transition-all duration-1000`} 
+                          style={{ width: `${student.attendancePercent}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 w-full bg-bg-soft rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${getAttendanceColor(student.attendancePercent).replace('text', 'bg')} transition-all duration-1000`} 
-                        style={{ width: `${student.attendancePercent}%` }}
-                      />
-                    </div>
-                  </div>
+                  ) : (
+                    <span className="text-gray-300 text-xs font-bold">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="space-y-1">
                     <Badge variant={student.feesStatus as StatusType}>{student.feesStatus}</Badge>
                     {student.feesStatus !== 'Paid' && (
-                      <p className="text-[10px] font-black text-red-500 uppercase tracking-tighter ml-1">₹{student.totalFeesDue.toLocaleString()} Due</p>
+                      <p className="text-[10px] font-black text-red-500 uppercase tracking-tighter ml-1">₹{(student.totalFeesDue ?? 0).toLocaleString()} Due</p>
                     )}
                   </div>
                 </TableCell>

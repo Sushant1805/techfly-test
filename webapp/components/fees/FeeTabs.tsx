@@ -5,9 +5,10 @@ import { LayoutDashboard, Wallet, ClipboardList, Settings } from 'lucide-react';
 interface FeeTabsProps {
   activeTab: 'Overview' | 'Collect' | 'Records' | 'Structure';
   onTabChange: (tab: 'Overview' | 'Collect' | 'Records' | 'Structure') => void;
+  userRole?: string;
 }
 
-export const FeeTabs: React.FC<FeeTabsProps> = ({ activeTab, onTabChange }) => {
+export const FeeTabs: React.FC<FeeTabsProps> = ({ activeTab, onTabChange, userRole }) => {
   const tabs = [
     { id: 'Overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'Collect', label: 'Collect Fee', icon: Wallet },
@@ -15,9 +16,15 @@ export const FeeTabs: React.FC<FeeTabsProps> = ({ activeTab, onTabChange }) => {
     { id: 'Structure', label: 'Fee Structure', icon: Settings },
   ] as const;
 
+  const filteredTabs = tabs.filter(tab => {
+    if (userRole === 'reception') return ['Collect', 'Records'].includes(tab.id);
+    return true;
+  });
+
   return (
     <div className="flex items-center gap-2 p-1.5 bg-white rounded-[24px] border border-gray-100 shadow-soft w-fit mb-10">
-      {tabs.map((tab) => {
+      {filteredTabs.map((tab) => {
+
         const isActive = activeTab === tab.id;
         return (
           <button

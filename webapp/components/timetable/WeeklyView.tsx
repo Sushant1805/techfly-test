@@ -21,10 +21,20 @@ const SLOTS = [
 ];
 
 export const WeeklyView: React.FC = () => {
+  const [userRole, setUserRole] = useState('teacher');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'Grid' | 'List'>('Grid');
   const [isEditMode, setIsEditMode] = useState(false);
   const [timetable, setTimetable] = useState<GeneratedTimetable>(activeTimetable);
+
+  React.useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      setUserRole(user.role);
+    }
+  }, []);
+
 
   const filteredEntries = useMemo(() => {
     if (selectedBatchId === 'All') return timetable.entries;
@@ -75,12 +85,15 @@ export const WeeklyView: React.FC = () => {
             <Printer className="w-4 h-4" /> Print
           </Button>
           
-          <Button 
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 transition-all ${isEditMode ? 'bg-text-slate text-white' : 'bg-brand-blue text-white shadow-lg shadow-brand-blue/20'}`}
-          >
-            {isEditMode ? <><Save className="w-4 h-4" /> Save Schedule</> : <><Edit3 className="w-4 h-4" /> Edit Timetable</>}
-          </Button>
+          {(userRole === 'owner' || userRole === 'manager') && (
+            <Button 
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 transition-all ${isEditMode ? 'bg-text-slate text-white' : 'bg-brand-blue text-white shadow-lg shadow-brand-blue/20'}`}
+            >
+              {isEditMode ? <><Save className="w-4 h-4" /> Save Schedule</> : <><Edit3 className="w-4 h-4" /> Edit Timetable</>}
+            </Button>
+          )}
+
         </div>
       </div>
 

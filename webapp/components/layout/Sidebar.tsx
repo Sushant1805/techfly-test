@@ -8,20 +8,37 @@ import {
   BarChart2, Shield, Settings, Menu, X, ChevronRight
 } from 'lucide-react';
 
-const mainNavItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Students', href: '/students', icon: Users },
-  { name: 'Batches', href: '/batches', icon: BookOpen },
-  { name: 'Attendance', href: '/attendance', icon: CheckSquare },
-  { name: 'Fees', href: '/fees', icon: IndianRupee },
-  { name: 'Tests', href: '/tests', icon: FileText },
-  { name: 'Timetable', href: '/timetable', icon: Calendar },
-  { name: 'Assignments', href: '/assignments', icon: ClipboardList },
-  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
+const ALL_NAV_ITEMS = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['owner', 'manager', 'teacher', 'reception'] },
+  { name: 'Branches', href: '/branches', icon: LayoutDashboard, roles: ['owner'] },
+  { name: 'Staff & HR', href: '/staff', icon: Users, roles: ['owner', 'manager'] },
+  { name: 'Students', href: '/students', icon: Users, roles: ['owner', 'manager', 'teacher', 'reception'] },
+  { name: 'Batches', href: '/batches', icon: BookOpen, roles: ['owner', 'manager', 'teacher'] },
+  { name: 'Attendance', href: '/attendance', icon: CheckSquare, roles: ['owner', 'manager', 'teacher'] },
+  { name: 'Fees', href: '/fees', icon: IndianRupee, roles: ['owner', 'manager', 'reception'] },
+  { name: 'Fee Templates', href: '/fee-templates', icon: FileText, roles: ['owner'] },
+  { name: 'Tests', href: '/tests', icon: FileText, roles: ['owner', 'manager', 'teacher'] },
+  { name: 'Timetable', href: '/timetable', icon: Calendar, roles: ['owner', 'manager', 'teacher', 'reception'] },
+  { name: 'Assignments', href: '/assignments', icon: ClipboardList, roles: ['owner', 'manager', 'teacher'] },
+  { name: 'Analytics', href: '/analytics', icon: BarChart2, roles: ['owner', 'manager'] },
+  { name: 'Help', href: '/help', icon: Shield, roles: ['owner', 'manager', 'teacher', 'reception'] },
 ];
 
 export const Sidebar = ({ isExpanded, setIsExpanded }: { isExpanded: boolean, setIsExpanded: (val: boolean) => void }) => {
   const pathname = usePathname();
+  const [userRole, setUserRole] = React.useState('teacher');
+
+  React.useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u && u.role) setUserRole(u.role);
+      }
+    } catch(e) {}
+  }, []);
+
+  const mainNavItems = ALL_NAV_ITEMS.filter(item => item.roles.includes(userRole));
 
   return (
     <aside 

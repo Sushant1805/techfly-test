@@ -20,7 +20,115 @@ const ModalOverlay: React.FC<{ children: React.ReactNode; onClose: () => void }>
 );
 
 export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student | null }> = ({ isOpen, onClose, title, student }) => {
+  const [name, setName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [standard, setStandard] = React.useState('');
+  const [batchId, setBatchId] = React.useState('');
+  const [batches, setBatches] = React.useState<any[]>([]);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState('');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setName(student?.name || '');
+      setPhone(student?.phone || '');
+      setEmail(student?.email || '');
+      setStandard(student?.standard || '');
+      setBatchId(student?.batchId || '');
+      setErrorMsg('');
+    }
+  }, [isOpen, student]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const instituteSlug = user.instituteId;
+        if (instituteSlug) {
+          fetch(`/api/${instituteSlug}/batches`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                setBatches(data.batches);
+              }
+            })
+            .catch(err => console.error('Error fetching batches:', err));
+        }
+      } catch (err) {
+        console.error('Error parsing user or fetching batches:', err);
+      }
+    }
+  }, [isOpen]);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setErrorMsg('Full Name is required');
+      return;
+    }
+    if (!phone.trim()) {
+      setErrorMsg('Student Phone is required');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        setErrorMsg('User session not found');
+        setSubmitting(false);
+        return;
+      }
+      const user = JSON.parse(userStr);
+      const instituteSlug = user.instituteId;
+      if (!instituteSlug) {
+        setErrorMsg('Institute details not found');
+        setSubmitting(false);
+        return;
+      }
+
+      const bodyData = {
+        name,
+        phone,
+        email: email || undefined,
+        standard: standard || undefined,
+        batchId: batchId || undefined,
+      };
+
+      const url = student 
+        ? `/api/${instituteSlug}/students/${student.id}` 
+        : `/api/${instituteSlug}/students`;
+      
+      const method = student ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyData),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        onClose();
+      } else {
+        setErrorMsg(result.message || 'Failed to save student');
+      }
+    } catch (err: any) {
+      console.error('Error saving student:', err);
+      setErrorMsg(err.message || 'An error occurred while saving student');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
+
   return (
     <ModalOverlay onClose={onClose}>
       <Card className="w-full max-w-2xl shadow-soft-lg animate-in fade-in zoom-in-95 slide-in-from-bottom-5 duration-300 border-white bg-white/90 backdrop-blur-3xl p-0 overflow-visible rounded-[40px] relative z-10">
@@ -35,16 +143,27 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
         </div>
 
         <div className="px-10 py-10 max-h-[70vh] overflow-y-auto space-y-10 custom-scrollbar">
+          {errorMsg && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-2xl text-sm font-semibold">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Section 1: Personal Details */}
           <section className="space-y-6">
             <h4 className="flex items-center gap-3 text-xs font-black text-brand-blue uppercase tracking-[0.2em] before:content-[''] before:w-1.5 before:h-1.5 before:rounded-full before:bg-brand-blue">Personal Details</h4>
             <div className="grid grid-cols-2 gap-6">
-              <Input label="Full Name *" placeholder="e.g. Arjun Mehta" defaultValue={student?.name} />
+              <Input 
+                label="Full Name *" 
+                placeholder="e.g. Arjun Mehta" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+              />
               <div className="space-y-2">
                 <label className="text-sm font-bold text-text-slate ml-1">Gender *</label>
                 <div className="flex gap-2">
                   {['Male', 'Female', 'Other'].map(g => (
-                    <button key={g} className={`flex-1 h-12 rounded-2xl border text-sm font-bold transition-all ${student?.gender === g ? 'bg-brand-blue border-brand-blue text-white shadow-soft' : 'bg-white border-gray-100 text-gray-500 hover:border-brand-blue/30'}`}>
+                    <button key={g} type="button" className={`flex-1 h-12 rounded-2xl border text-sm font-bold transition-all ${student?.gender === g ? 'bg-brand-blue border-brand-blue text-white shadow-soft' : 'bg-white border-gray-100 text-gray-500 hover:border-brand-blue/30'}`}>
                       {g}
                     </button>
                   ))}
@@ -53,7 +172,12 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
             </div>
             <div className="grid grid-cols-2 gap-6">
               <Input label="Date of Birth" type="date" defaultValue={student?.dob} />
-              <Input label="Student Phone" placeholder="9876543210" defaultValue={student?.phone} />
+              <Input 
+                label="Student Phone *" 
+                placeholder="9876543210" 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)} 
+              />
             </div>
           </section>
 
@@ -63,7 +187,11 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-text-slate ml-1">Standard / Class *</label>
-                <select className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all" defaultValue={student?.standard}>
+                <select 
+                  className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all" 
+                  value={standard}
+                  onChange={(e) => setStandard(e.target.value)}
+                >
                   <option value="">Select Class</option>
                   <option value="Std 9">Std 9</option>
                   <option value="Std 10">Std 10</option>
@@ -73,11 +201,17 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-text-slate ml-1">Batch *</label>
-                <select className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all" defaultValue={student?.batch}>
+                <select 
+                  className="flex h-12 w-full rounded-2xl border border-gray-100 bg-white px-4 text-sm font-bold text-text-slate focus:outline-none focus:ring-4 focus:ring-brand-blue/10 focus:border-brand-blue/30 shadow-sm transition-all" 
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                >
                   <option value="">Select Batch</option>
-                  <option value="Batch A">Batch A</option>
-                  <option value="Batch B">Batch B</option>
-                  <option value="Batch C">Batch C</option>
+                  {batches.map((b: any) => (
+                    <option key={b._id} value={b._id}>
+                      {b.name} ({b.standard})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -92,7 +226,7 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
                 <label className="text-sm font-bold text-text-slate ml-1">Relation *</label>
                 <div className="flex gap-2">
                   {['Father', 'Mother', 'Guardian'].map(r => (
-                    <button key={r} className={`flex-1 h-12 rounded-2xl border text-sm font-bold transition-all ${student?.parentRelation === r ? 'bg-brand-blue border-brand-blue text-white shadow-soft' : 'bg-white border-gray-100 text-gray-500 hover:border-brand-blue/30'}`}>
+                    <button key={r} type="button" className={`flex-1 h-12 rounded-2xl border text-sm font-bold transition-all ${student?.parentRelation === r ? 'bg-brand-blue border-brand-blue text-white shadow-soft' : 'bg-white border-gray-100 text-gray-500 hover:border-brand-blue/30'}`}>
                       {r}
                     </button>
                   ))}
@@ -101,14 +235,20 @@ export const AddEditStudentModal: React.FC<BaseModalProps & { student?: Student 
             </div>
             <div className="grid grid-cols-2 gap-6">
               <Input label="Parent Phone *" defaultValue={student?.parentPhone} />
-              <Input label="Parent Email" defaultValue={student?.email} />
+              <Input 
+                label="Parent Email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+              />
             </div>
           </section>
         </div>
 
         <div className="px-10 py-8 border-t border-gray-100/50 flex items-center justify-end gap-4">
-          <Button variant="ghost" onClick={onClose} className="px-8">Cancel</Button>
-          <Button onClick={onClose} className="px-12 h-14 text-base">{student ? 'Save Changes' : 'Save Student'}</Button>
+          <Button variant="ghost" onClick={onClose} disabled={submitting} className="px-8">Cancel</Button>
+          <Button onClick={handleSave} disabled={submitting} className="px-12 h-14 text-base">
+            {submitting ? 'Saving...' : student ? 'Save Changes' : 'Save Student'}
+          </Button>
         </div>
       </Card>
     </ModalOverlay>

@@ -85,17 +85,17 @@ export const BatchTable: React.FC<BatchTableProps> = ({ batches, onView, onEdit,
                 </TableCell>
                 <TableCell>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-bold text-text-slate leading-none">{batch.schedule.map(s => s.day.substring(0, 3)).join('/')}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{batch.schedule[0].startTime}–{batch.schedule[0].endTime} AM</p>
+                    <p className="text-sm font-bold text-text-slate leading-none">{(batch.schedule || []).map(s => (s.day || '').substring(0, 3)).join('/')}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{batch.schedule?.[0]?.startTime || '10:00'}–{batch.schedule?.[0]?.endTime || '12:00'} AM</p>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className={`font-black text-sm ${getAttendanceColor(batch.averageAttendance)}`}>
-                    {batch.averageAttendance}%
+                  <span className={`font-black text-sm ${getAttendanceColor(batch.averageAttendance || 0)}`}>
+                    {batch.averageAttendance || 0}%
                   </span>
                 </TableCell>
                 <TableCell>
-                  <span className="font-bold text-sm text-text-slate whitespace-nowrap">₹{batch.fees.toLocaleString()}</span>
+                  <span className="font-bold text-sm text-text-slate whitespace-nowrap">₹{(batch.fees || 0).toLocaleString()}</span>
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(batch.status)}>{batch.status}</Badge>
